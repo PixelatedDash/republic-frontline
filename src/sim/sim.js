@@ -408,8 +408,9 @@ function fire(sim, t, st, target, k, shots) {
     x: t.x + Math.cos(a) * 6, y: t.y - 4 + Math.sin(a) * 6, px: 0, py: 0,
     tx: target.x, ty: target.y, vx: Math.cos(a), vy: Math.sin(a),
     speed: st.projSpeed, dmg, dtype: TOWERS[t.type].dtype, splash: st.splash || 0,
-    air: target.air, crit, ttl: 4, bomb: st.bomblets ? 1 : 0, delay: k * 0.12,
+    air: target.air, crit, ttl: 4, bomb: st.bomblets ? 1 : 0, delay: k * 0.12, d0: 1,
   };
+  p.d0 = Math.max(1, Math.hypot(target.x - p.x, target.y - p.y));
   p.px = p.x;
   p.py = p.y;
   s.projectiles.push(p);

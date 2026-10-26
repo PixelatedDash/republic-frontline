@@ -339,3 +339,19 @@ export function shadowBlob(w, h = 3, alpha = 80) {
     }
   return bm;
 }
+
+// Blue hologram treatment for briefing transmissions: luminance -> cyan
+// ramp, alternate rows dimmed as scanlines. Flicker is applied at draw time.
+const HOLO = ['#e2fdff', '#9ff0ff', '#56cdf2', '#2a8cc4', '#134e80'];
+export function hologram(src) {
+  const out = new Bitmap(src.w, src.h);
+  for (let y = 0; y < src.h; y++)
+    for (let x = 0; x < src.w; x++) {
+      const p = src.d[y * src.w + x];
+      if (!(p >>> 24)) continue;
+      const lum = ((p & 255) + ((p >>> 8) & 255) + ((p >>> 16) & 255)) / 765;
+      const i = lum > 0.8 ? 0 : lum > 0.62 ? 1 : lum > 0.42 ? 2 : lum > 0.22 ? 3 : 4;
+      out.set(x, y, rgba(HOLO[i], y % 2 ? 150 : 235));
+    }
+  return out;
+}
