@@ -1,0 +1,28 @@
+// Art lint: fails if any composed tower/enemy frame has an orphan pixel
+// (an opaque pixel with no opaque 4-neighbor).   node tools/art/lint-art.mjs
+import { buildArt, TIERS } from '../../src/art/index.js';
+import { composeRifle, composeTurret, DIRS8 } from '../../src/art/towers.js';
+
+const art = buildArt();
+const orphans = (b) => {
+  let n = 0;
+  for (let y = 0; y < b.h; y++)
+    for (let x = 0; x < b.w; x++) {
+      if (!(b.get(x, y) >>> 24)) continue;
+      if (!((b.get(x - 1, y) | b.get(x + 1, y) | b.get(x, y - 1) | b.get(x, y + 1)) >>> 24)) n++;
+    }
+  return n;
+};
+const frames = [];
+for (const t of TIERS) {
+  for (const d of DIRS8) frames.push([`rifle ${t} ${d}`, composeRifle(art.towers.rifle[t], d)]);
+  for (const k of ['rocket', 'flak']) for (let d = 0; d < 16; d++) frames.push([`${k} ${t} dir${d}`, composeTurret(art.towers[k][t], d)]);
+}
+for (const [k, e] of Object.entries(art.enemies)) {
+  if (k === 'fighter') e.frames.flat().forEach((f, i) => frames.push([`fighter ${i}`, f]));
+  else [...e.walk, ...e.death.slice(1)].forEach((f, i) => frames.push([`${k} ${i}`, f]));
+}
+const bad = frames.map(([n, f]) => [n, orphans(f)]).filter(([, c]) => c > 0);
+console.log(`lint-art: ${frames.length} frames, ${bad.length} with orphan pixels`);
+for (const [n, c] of bad) console.log(`  ${n}: ${c}`);
+process.exit(bad.length ? 1 : 0);

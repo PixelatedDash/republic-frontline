@@ -1,0 +1,14 @@
+{
+  "name": "republic-frontline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pixel-art tower defense PWA. The game itself has no build step; devDependencies are for tools/ only.",
+  "scripts": {
+    "art": "node tools/export-art.mjs"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "1.0.9",
+    "pptxgenjs": "4.0.1"
+  }
+}
