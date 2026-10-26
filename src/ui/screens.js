@@ -25,19 +25,24 @@ class Backdrop {
     if ((this.nextLight -= dt) <= 0) { this.nextLight = 7 + Math.random() * 9; this.light = 0.5; this.app.audio.sfx('thunder', { vol: 0.5 }); }
   }
   draw(r, ui) {
-    r.ui();
-    const g = this.ground[Math.floor(this.t * 3) % 4];
-    const span = Math.max(0, 768 - ui.vw), spanY = Math.max(0, 448 - ui.vh);
+    // world-density pass (2x detail art at the world scale)
+    const sc = this.app.sc, k = sc.SW;
+    const g = this.ground[Math.floor(this.t * 6) % this.ground.length];
+    const vw = sc.dw / k, vh = sc.dh / k;
+    const span = Math.max(0, g.width - vw), spanY = Math.max(0, g.height - vh);
     const x = -Math.round((Math.sin(this.t * 0.03) * 0.5 + 0.5) * span);
     const y = -Math.round((Math.cos(this.t * 0.021) * 0.5 + 0.5) * spanY);
+    r.ctx.setTransform(k, 0, 0, k, 0, 0);
+    r.mode = 'world';
     r.canvasAt(g, x, y);
+    r.ui();
     r.rect(0, 0, ui.vw, ui.vh, '#05080b', 0.45);
     const drop = this.app.assets.vfx.rain;
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 140; i++) {
       const sx = (i * 97.3) % 1, sy = (i * 57.7) % 1;
       const yy = ((sy * (ui.vh + 20) + this.t * 200) % (ui.vh + 20)) - 10;
       const xx = ((((sx * (ui.vw + 40) - this.t * 55) % (ui.vw + 40)) + ui.vw + 40) % (ui.vw + 40)) - 20;
-      r.spr(drop, xx, yy, 0.7);
+      r.hi(drop, xx, yy, 0.7);
     }
     if (this.light > 0) r.rect(0, 0, ui.vw, ui.vh, '#dff4ff', this.light * 0.4);
   }
@@ -95,17 +100,14 @@ export class TitleScreen {
     const cx = ui.vw >> 1;
     const es = A.emblemSize;
     const ls = A.logoSize;
-    const blockW = es.w * 2 + 10 + Math.max(ls[0].w, ls[1].w);
+    const ew = Math.round(es.w * app.sc.HI * 2 / app.sc.S), eh = Math.round(es.h * app.sc.HI * 2 / app.sc.S);
+    const blockW = ew + 10 + Math.max(ls[0].w, ls[1].w);
     const lx = Math.round(cx - blockW / 2), ly = Math.max(10, Math.round(ui.vh * 0.12));
-    r.ctx.save();
-    r.ctx.translate(lx, ly);
-    r.ctx.scale(2, 2);
-    r.spr(A.emblem, 0, 0);
-    r.ctx.restore();
-    r.spr(A.logo[0], lx + es.w * 2 + 10, ly + 4);
-    r.spr(A.logo[1], lx + es.w * 2 + 10, ly + 6 + ls[0].h);
+    r.hi(A.emblem, lx, ly, 1, app.sc.HI * 2);
+    r.spr(A.logo[0], lx + ew + 10, ly + 4);
+    r.spr(A.logo[1], lx + ew + 10, ly + 6 + ls[0].h);
     const bw = Math.min(170, ui.vw - 40);
-    let by = ly + es.h * 2 + 14;
+    let by = ly + eh + 14;
     const btn = (id, label, style, disabled = false) => { const c = ui.button(id, cx - bw / 2, by, bw, T, { label, style, disabled }); by += T + 5; return c; };
     const ip = app.save.inProgress;
     if (!this.menu) {
@@ -162,14 +164,11 @@ export class BriefingScreen {
     // hologram transmission: flicker + typed lines
     const hs = A.hologramSize;
     const flick = this.t < 0.4 ? (Math.floor(this.t * 30) % 2 ? 0.2 : 0.9) : 0.78 + 0.22 * Math.sin(this.t * 37) * Math.sin(this.t * 5.3);
-    r.rect(x + 8, y + 18, hs.w * 2 + 8, hs.h * 2 + 8, '#0b2533', 0.8);
-    r.ctx.save();
-    r.ctx.translate(x + 12, y + 22);
-    r.ctx.scale(2, 2);
-    r.spr(A.hologram, Math.floor(this.t * 2) % 7 === 0 ? 1 : 0, 0, flick);
-    r.ctx.restore();
-    r.text('INCOMING TRANSMISSION', x + 8, y + 26 + hs.h * 2, COLORS.dim);
-    const tx = x + 8 + hs.w * 2 + 16, tw = w - (tx - x) - 8;
+    const pw = Math.round(hs.w * app.sc.HI * 2 / app.sc.S), ph = Math.round(hs.h * app.sc.HI * 2 / app.sc.S);
+    r.rect(x + 8, y + 18, pw + 8, ph + 8, '#0b2533', 0.8);
+    r.hi(A.hologram, x + 12 + (Math.floor(this.t * 2) % 7 === 0 ? 1 : 0), y + 22, flick, app.sc.HI * 2);
+    r.text('INCOMING TRANSMISSION', x + 8, y + 30 + ph, COLORS.dim);
+    const tx = x + 8 + pw + 16, tw = w - (tx - x) - 8;
     let chars = Math.floor(this.t * 45);
     let ty = y + 20;
     for (const line of this.def.briefing) {
@@ -182,15 +181,16 @@ export class BriefingScreen {
       ty += 3;
     }
     // expected enemies
-    let ey = Math.max(ty + 4, y + 26 + hs.h * 2 + 12);
+    let ey = Math.max(ty + 4, y + 30 + ph + 12);
     r.text('EXPECTED CONTACTS', x + 8, ey, COLORS.dim);
     ey += 10;
     let ex = x + 8;
     for (const t of this.types) {
       const set = A.enemies[t];
       const ref = set.walk ? set.walk[0] : set.frames[0][0];
-      r.spr(ref, ex, ey + 20 - (set.walk ? set.h : 18));
-      ex += (set.walk ? set.w : 20) + 6;
+      const hw = (set.walk ? set.w : set.size) / 2, hh = (set.walk ? set.h : set.size * 0.9) / 2;
+      r.hi(ref, ex, ey + 20 - Math.round(hh));
+      ex += Math.round(hw) + 6;
     }
     r.text(this.types.map((t) => ENEMIES[t].name.toUpperCase()).join(', '), x + 8, ey + 24, COLORS.faint);
     // difficulty
@@ -257,11 +257,7 @@ export class ResultScreen {
         const k = on ? Math.min(1, (this.t - 0.5 - i * 0.45) / 0.15) : 1;
         const ref = on ? A.icons.star : A.icons.starEmpty;
         const n = on && k < 1 ? 3 : 2;
-        r.ctx.save();
-        r.ctx.translate(Math.round(x + w / 2 - 40 + i * 28 - (n * 9) / 2 + 9), cy - (n - 2) * 4);
-        r.ctx.scale(n, n);
-        r.spr(ref, 0, 0);
-        r.ctx.restore();
+        r.hi(ref, Math.round(x + w / 2 - 40 + i * 28 - (n * 9) / 2 + 9), cy - (n - 2) * 4, 1, app.sc.HI * n);
       }
       cy += 28;
     } else {

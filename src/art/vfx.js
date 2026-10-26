@@ -4,6 +4,7 @@
 // drawing, batched per layer by the renderer.
 
 import { Bitmap, blit, fromMap, rgba, pack } from './bitmap.js';
+import { hd } from './rotsprite.js';
 import { REPUBLIC_BOLT, SEPARATIST_BOLT, ION, FIRE, SMOKE, SCORCH, SPARK, SHIELD } from './palettes.js';
 
 // Visual-only seeded RNG (gameplay uses src/engine/rng.js).
@@ -36,8 +37,8 @@ function line(x0, y0, x1, y1, cb) {
 // ------------------------------------------------------------- bolts -------
 // Elongated streak per direction: white-hot head, saturated body, dim tail,
 // plus a 1px translucent sheath. Direction 0 = east, clockwise.
-export function boltFrames(pal, dirs = 16, len = 8) {
-  const size = len + 5;
+export function boltFrames(pal, dirs = 32, len = 16) {
+  const size = len + 7;
   const c = (size / 2) | 0;
   const out = [];
   for (let d = 0; d < dirs; d++) {
@@ -47,12 +48,16 @@ export function boltFrames(pal, dirs = 16, len = 8) {
     const bm = new Bitmap(size, size);
     const pts = [];
     line(hx, hy, tx, ty, (x, y, i) => pts.push([x, y, i]));
-    const n = pts.length;
+    // 2px core: duplicate the line one pixel across the travel direction
+    const px = Math.abs(Math.sin(a)) > Math.abs(Math.cos(a)) ? 1 : 0, py = 1 - px;
+    const n0 = pts.length;
+    for (let k = 0; k < n0; k++) pts.push([pts[k][0] + px, pts[k][1] + py, pts[k][2]]);
+    const n = n0;
     const sheath = rgba(pal[3], 150);
     for (const [x, y] of pts)
       for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!(bm.get(x + ox, y + oy) >>> 24)) bm.set(x + ox, y + oy, sheath);
     for (const [x, y, i] of pts) {
-      const t = i / (n - 1);
+      const t = i / Math.max(1, n - 1);
       bm.set(x, y, rgba(t < 0.15 ? pal[0] : t < 0.35 ? pal[1] : t < 0.8 ? pal[2] : pal[3]));
     }
     out.push(bm);
@@ -82,12 +87,12 @@ export function ionArc(len = 40, frames = 3, seed = 7) {
   const out = [];
   for (let f = 0; f < frames; f++) {
     const rnd = mulberry32(seed + f * 31);
-    const h = 13, bm = new Bitmap(len, h);
-    let y = 6;
+    const h = 25, bm = new Bitmap(len, h);
+    let y = 12;
     const pts = [];
-    for (let x = 0; x < len; x += 4) {
-      const ny = x === 0 || x + 4 >= len ? 6 : Math.max(1, Math.min(h - 2, 6 + Math.round((rnd() - 0.5) * 9)));
-      line(x, y, Math.min(len - 1, x + 4), ny, (px, py) => pts.push([px, py]));
+    for (let x = 0; x < len; x += 6) {
+      const ny = x === 0 || x + 6 >= len ? 12 : Math.max(2, Math.min(h - 3, 12 + Math.round((rnd() - 0.5) * 18)));
+      line(x, y, Math.min(len - 1, x + 6), ny, (px, py) => { pts.push([px, py]); pts.push([px, py + 1]); });
       y = ny;
     }
     const halo = rgba(ION[3], 120);
@@ -95,8 +100,8 @@ export function ionArc(len = 40, frames = 3, seed = 7) {
     for (const [x, py] of pts) bm.set(x, py, rgba(ION[f === 1 ? 0 : 1]));
     // branch
     const bx = 8 + Math.floor(rnd() * (len - 16));
-    const by = pts.find((p) => p[0] === bx)?.[1] ?? 6;
-    line(bx, by, bx + 4, by + (rnd() < 0.5 ? -4 : 4), (px, py) => bm.set(px, py, rgba(ION[2])));
+    const by = pts.find((p) => p[0] === bx)?.[1] ?? 12;
+    line(bx, by, bx + 8, by + (rnd() < 0.5 ? -8 : 8), (px, py) => bm.set(px, py, rgba(ION[2])));
     out.push(bm);
   }
   return out;
@@ -217,11 +222,13 @@ export function scorch(r = 9, seed = 5) {
 // Hex-bubble ripple: a hex lattice masked to an ellipse, bright at the impact
 // side, expanding and fading over 4 frames.
 const HEX = [
-  '..VV..',
-  '.V..V.',
-  'V....V',
-  '.V..V.',
-  '..VV..',
+  '...VVVV...',
+  '..V....V..',
+  '.V......V.',
+  'V........V',
+  '.V......V.',
+  '..V....V..',
+  '...VVVV...',
 ];
 export function shieldRipple(w = 20, h = 22, frames = 4) {
   const out = [];
@@ -232,9 +239,9 @@ export function shieldRipple(w = 20, h = 22, frames = 4) {
       for (let x = 0; x < w; x++) {
         const d = Math.hypot((x + 0.5 - cx) / (w / 2), (y + 0.5 - cy) / (h / 2));
         if (d > 1) continue;
-        const rim = d > 0.86;
-        const row = HEX[(y + (Math.floor(x / 6) % 2) * 2) % 5];
-        const onHex = row[x % 6] === 'V';
+        const rim = d > 0.92;
+        const row = HEX[(y + (Math.floor(x / 10) % 2) * 3) % 7];
+        const onHex = row[x % 10] === 'V';
         // ripple band travels outward from the impact (left side)
         const band = Math.abs(d - f / (frames - 1)) < 0.28;
         if (rim) bm.set(x, y, rgba(SHIELD[f < 2 ? 1 : 2], 210 - f * 40));
@@ -248,11 +255,15 @@ export function shieldRipple(w = 20, h = 22, frames = 4) {
 
 // ------------------------------------------------------------- small fx ----
 export const MUZZLE_FIRE = [
-  '..F..',
-  '.FfF.',
-  'Ff#fF',
-  '.FfF.',
-  '..F..',
+  '....F....',
+  '...FfF...',
+  '..FfFfF..',
+  '.FfF#FfF.',
+  'FfF###FfF',
+  '.FfF#FfF.',
+  '..FfFfF..',
+  '...FfF...',
+  '....F....',
 ];
 export const BACKBLAST = [
   '..s..',
@@ -261,19 +272,20 @@ export const BACKBLAST = [
   '.sfs.',
   '..s..',
 ];
-export function impactSparks(pal, frames = 3) {
+export function impactSparks(pal, frames = 4) {
   const maps = [
-    ['..a..', '.aBa.', 'aBWBa', '.aBa.', '..a..'],
-    ['a...a', '..B..', '.BWB.', '..B..', 'a...a'],
-    ['a...a', '.....', '..a..', '.....', 'a...a'],
+    ['....a....', '...aBa...', '..aBWBa..', '.aBWWWBa.', 'aBWWWWWBa', '.aBWWWBa.', '..aBWBa..', '...aBa...', '....a....'],
+    ['a.......a', '.a..B..a.', '...BWB...', '..BWWWB..', '.BWWWWWB.', '..BWWWB..', '...BWB...', '.a..B..a.', 'a.......a'],
+    ['a.......a', '.........', '..a.B.a..', '...BWB...', '..BWWWB..', '...BWB...', '..a.B.a..', '.........', 'a.......a'],
+    ['a.......a', '.........', '.........', '....B....', '...B.B...', '....B....', '.........', '.........', 'a.......a'],
   ];
   return maps.slice(0, frames).map((m) => fromMap(m, { a: pal[3], B: pal[2], W: pal[0] }));
 }
 export function metalSparks() {
   const maps = [
-    ['....a', '.a.b.', '..W..', '.b.a.', 'a....'],
-    ['a...b', '.....', '.b.a.', 'a....', '....a'],
-    ['.....', 'b....', '...a.', '.....', '.a...'],
+    ['........a', '.......a.', '..b..ba..', '...bWWb..', '...WWWW..', '..bWWb...', '.ab..b...', 'a........', '.........'],
+    ['a.......b', '.a.....b.', '.........', '...b.a...', '....W....', '...a.b...', '.........', '.b.....a.', 'b.......a'],
+    ['b........', '.........', '......a..', '.........', '...a.....', '.........', '.......b.', '.........', '..a......'],
   ];
   return maps.map((m) => fromMap(m, { a: SPARK[2], b: SPARK[1], W: SPARK[0] }));
 }
@@ -284,12 +296,10 @@ export const DEBRIS = [
   ['k.', 'kk'],
 ];
 export function rainStreak() {
-  return fromMap(['0', '0', '9', '9', '3'], { 0: '#c9dcdc', 9: '#9fb7b8', 3: '#6f8789' }).d && (() => {
-    const bm = new Bitmap(2, 6);
-    const c1 = rgba('#cfe0e0', 150), c2 = rgba('#9fb7b8', 110);
-    bm.set(1, 0, c1); bm.set(1, 1, c1); bm.set(1, 2, c2); bm.set(0, 3, c2); bm.set(0, 4, c2); bm.set(0, 5, rgba('#9fb7b8', 70));
-    return bm;
-  })();
+  const bm = new Bitmap(3, 11);
+  const c1 = rgba('#d6e6e6', 160), c2 = rgba('#a6bcbd', 120), c3 = rgba('#8aa1a2', 70);
+  [[2, 0, c1], [2, 1, c1], [2, 2, c1], [2, 3, c2], [1, 4, c2], [1, 5, c2], [1, 6, c2], [1, 7, c3], [0, 8, c3], [0, 9, c3], [0, 10, c3]].forEach(([x, y, c]) => bm.set(x, y, c));
+  return bm;
 }
 export function rainSplash() {
   const maps = [
@@ -297,32 +307,32 @@ export function rainSplash() {
     ['.....', '.0.0.', '..9..'],
     ['0...0', '.....', '.9.9.'],
   ];
-  return maps.map((m) => fromMap(m, { 0: '#d6e4e4', 9: '#8fa5a6' }));
+  return maps.map((m) => hd(fromMap(m, { 0: '#d6e4e4', 9: '#8fa5a6' }), false));
 }
 
 export function buildVfx() {
   return {
     boltRep: boltFrames(REPUBLIC_BOLT),
     boltSep: boltFrames(SEPARATIST_BOLT),
-    glowRep: glow(REPUBLIC_BOLT[2], 5),
-    glowSep: glow(SEPARATIST_BOLT[2], 5),
-    glowIon: glow(ION[2], 7),
-    glowFire: glow(FIRE[3], 12, 120),
-    ionArc: ionArc(),
-    ionBurst: ionBurst(),
-    expS: explosion(6, 7, 1),
-    expM: explosion(10, 8, 2),
-    expL: explosion(17, 10, 3),
-    smoke: smokePuff(9, 6, 3),
-    smokeBig: smokePuff(10, 7, 9),
-    scorch: [scorch(7, 5), scorch(10, 11), scorch(15, 17)],
-    shield: shieldRipple(),
+    glowRep: glow(REPUBLIC_BOLT[2], 10),
+    glowSep: glow(SEPARATIST_BOLT[2], 10),
+    glowIon: glow(ION[2], 14),
+    glowFire: glow(FIRE[3], 24, 120),
+    ionArc: ionArc(80, 4),
+    ionBurst: ionBurst().map((b) => hd(b, false)),
+    expS: explosion(12, 10, 1),
+    expM: explosion(20, 12, 2),
+    expL: explosion(34, 15, 3),
+    smoke: smokePuff(16, 8, 3),
+    smokeBig: smokePuff(22, 9, 9),
+    scorch: [scorch(14, 5), scorch(20, 11), scorch(30, 17)],
+    shield: shieldRipple(40, 44, 6),
     sparksRep: impactSparks(REPUBLIC_BOLT),
     sparksSep: impactSparks(SEPARATIST_BOLT),
     sparksMetal: metalSparks(),
     muzzleFire: fromMap(MUZZLE_FIRE),
-    backblast: fromMap(BACKBLAST, { s: SMOKE[1] }),
-    debris: DEBRIS.map((m) => fromMap(m)),
+    backblast: hd(fromMap(BACKBLAST, { s: SMOKE[1] }), false),
+    debris: DEBRIS.map((m) => hd(fromMap(m))),
     rain: rainStreak(),
     splash: rainSplash(),
   };

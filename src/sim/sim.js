@@ -50,7 +50,7 @@ function attach(state) {
     level,
     events: [],
     emit: true,
-    hash: new SpatialHash(level.w * TILE, level.h * TILE, 32),
+    hash: new SpatialHash(level.w * TILE, level.h * TILE, 64),
     byId: new Map(),
     scratch: new Array(512),
     dmgOut: {},
@@ -153,7 +153,7 @@ function spawnEnemy(sim, p) {
   const air = d.layer === 'air';
   const path = air ? sim.level.lanes[p.lane] : sim.level.paths[p.path];
   pointOnPath(path, 0, P);
-  const ofs = air ? 0 : (rand(s.rng) - 0.5) * 6;
+  const ofs = air ? 0 : (rand(s.rng) - 0.5) * 12;
   const e = {
     id: s.nextId++, type: p.type, wave: p.wave, air,
     body: d.body,
@@ -405,7 +405,7 @@ function fire(sim, t, st, target, k, shots) {
   const a = t.aim + spread;
   const p = {
     id: s.nextId++, kind: st.proj, tower: t.id, target: target.id,
-    x: t.x + Math.cos(a) * 6, y: t.y - 4 + Math.sin(a) * 6, px: 0, py: 0,
+    x: t.x + Math.cos(a) * 12, y: t.y - 8 + Math.sin(a) * 12, px: 0, py: 0,
     tx: target.x, ty: target.y, vx: Math.cos(a), vy: Math.sin(a),
     speed: st.projSpeed, dmg, dtype: TOWERS[t.type].dtype, splash: st.splash || 0,
     air: target.air, crit, ttl: 4, bomb: st.bomblets ? 1 : 0, delay: k * 0.12, d0: 1,
@@ -464,7 +464,7 @@ function impact(sim, p, tgt) {
   const s = sim.state;
   if (p.splash > 0) {
     splash(sim, p.x, p.y, p.splash, p.dmg, p.dtype, p.air, p.tower);
-    ev(sim, { t: 'explode', x: p.x, y: p.y, size: p.splash >= 24 ? 'm' : 's', kind: p.kind, air: p.air });
+    ev(sim, { t: 'explode', x: p.x, y: p.y, size: p.splash >= 48 ? 'm' : 's', kind: p.kind, air: p.air });
     if (p.bomb) {
       const st = TOWERS[sim.byId.get(p.tower)?.type || 'rocket'].tiers.t4b.bomblets;
       for (let i = 0; i < st.count; i++) {

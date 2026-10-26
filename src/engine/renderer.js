@@ -37,12 +37,29 @@ export class Renderer {
   }
 
   world(cam) {
-    this.scale = cam.W;
-    this.ctx.setTransform(cam.W, 0, 0, cam.W, cam.offX, cam.offY);
+    this.mode = 'world';
+    this.scale = cam.Z;
+    // smoothing only matters during the 120 ms zoom ease; at rest Z is an integer
+    this.ctx.setTransform(cam.Z, 0, 0, cam.Z, cam.offX, cam.offY);
+  }
+
+  // Draw a 2x-detail sprite inside the UI layer at the HI scale, positioned
+  // in UI art px (keeps whole device pixels).
+  hi(ref, ux, uy, a = 1, k = this.sc.HI) {
+    if (!ref) return;
+    const { S, ox, oy } = this.sc;
+    const c = this.ctx;
+    c.save();
+    c.setTransform(k, 0, 0, k, Math.round(ox + ux * S), Math.round(oy + uy * S));
+    if (a !== 1) c.globalAlpha = a;
+    c.drawImage(ref.page, ref.x, ref.y, ref.w, ref.h, 0, 0, ref.w, ref.h);
+    c.restore();
+    this.drawCalls++;
   }
 
   ui() {
     const { S, ox, oy } = this.sc;
+    this.mode = 'ui';
     this.scale = S;
     this.ctx.setTransform(S, 0, 0, S, ox, oy);
   }
@@ -61,6 +78,7 @@ export class Renderer {
 
   spr(ref, x, y, a = 1) {
     if (!ref) return;
+    if (ref.hi && this.mode === 'ui') return this.hi(ref, x, y, a);
     const c = this.ctx;
     if (a !== 1) c.globalAlpha = a;
     c.drawImage(ref.page, ref.x, ref.y, ref.w, ref.h, Math.round(x), Math.round(y), ref.w, ref.h);

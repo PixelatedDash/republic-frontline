@@ -4,31 +4,49 @@
 // hand-placed sandbag pieces; tier dressing is hand-placed overlay maps.
 
 import { Bitmap, blit, fromMap, rgba, fill } from '../bitmap.js';
+import { hd } from '../rotsprite.js';
 
-// Sandbag front face (stacked brickwork) and top-of-wall pieces.
+// Sandbag pieces at 2x detail: front face (stacked brickwork), top course,
+// and side-wall bags seen from above. Seams and stitching are hand-placed.
 const BAG_FACE = [
-  '.kkkkkk.',
-  'kyyyyyYk',
-  'kYYYYYok',
-  'koooooOk',
-  '.kkkkkk.',
+  '..kkkkkkkkkkkk..',
+  '.kyyyyyyyyyyyYk.',
+  'kyyyyyyyyyyyYYok',
+  'kyyYYYYYYYYYYook',
+  'kyYYYYYYYYYYYook',
+  'kYYYYYYYYYYoooOk',
+  'kYoYYYYYYYoooOOk',
+  'koooooooooooOOOk',
+  '.kOOOOOOOOOOOOk.',
+  '..kkkkkkkkkkkk..',
 ];
 const BAG_TOP = [
-  '.kkkkkk.',
-  'kyyyyyyk',
-  'kyyyyyYk',
-  'kYYYYYok',
+  '..kkkkkkkkkkkk..',
+  '.kyyyyyyyyyyyyk.',
+  'kyyyyyyyyyyyyyYk',
+  'kyyyyyyyyyyyyYYk',
+  'kyyyyyyyyyyyYYYk',
+  'kYyyyyyyyyyYYYok',
+  'kYYYYYYYYYYYYoOk',
+  'kooooooooooooOOk',
 ];
-// Side wall bag seen from above (runs front-to-back).
 const BAG_SIDE = [
-  '.kkkk.',
-  'kyyyyk',
-  'kyyyYk',
-  'kyyYYk',
-  'kyYYok',
-  'kYYook',
-  'kYoooO',
-  '.kkkk.',
+  '..kkkkkkkk..',
+  '.kyyyyyyyyk.',
+  'kyyyyyyyyYYk',
+  'kyyyyyyyyYYk',
+  'kyyyyyyyYYok',
+  'kyyyyyyyYYok',
+  'kyyyyyyYYYok',
+  'kyYyyyyYYook',
+  'kyYYyyYYYook',
+  'kYYYYYYYYook',
+  'kYYYYYYYoook',
+  'kYYYYYYooook',
+  'kYooooooooOk',
+  'kooooooooOOk',
+  '.kOOOOOOOOk.',
+  '..kkkkkkkk..',
 ];
 
 const SHADE = { y: 'Y', Y: 'o', o: 'O', O: 'O' };
@@ -52,13 +70,13 @@ function bagTone(x, y, dark) {
 
 // Wall of `rows` face courses plus a top course, `w` px wide.
 function wall(w, rows, dark = false, seed = 0) {
-  const h = 3 + rows * 4 + 1;
+  const h = 6 + rows * 8 + 2;
   const bm = new Bitmap(w, h);
   for (let r = rows - 1; r >= 0; r--) {
-    const off = r % 2 ? -4 : 0;
-    for (let x = off; x < w; x += 7) blit(bm, fromMap(tone(BAG_FACE, bagTone(x, r + seed, dark))), x, 3 + r * 4);
+    const off = r % 2 ? -8 : 0;
+    for (let x = off; x < w; x += 14) blit(bm, fromMap(tone(BAG_FACE, bagTone(x, r + seed, dark))), x, 6 + r * 8);
   }
-  for (let x = -2; x < w; x += 7) blit(bm, fromMap(tone(BAG_TOP, bagTone(x, 9 + seed, dark) === 1 ? 2 : 0)), x, 0);
+  for (let x = -4; x < w; x += 14) blit(bm, fromMap(tone(BAG_TOP, bagTone(x, 9 + seed, dark) === 1 ? 2 : 0)), x, 0);
   // crisp vertical outline at the ends
   for (let y = 1; y < h - 1; y++) {
     if (bm.get(0, y) >>> 24) bm.set(0, y, rgba('#101217'));
@@ -68,8 +86,8 @@ function wall(w, rows, dark = false, seed = 0) {
 }
 
 function sideWall(h, seed = 0) {
-  const bm = new Bitmap(6, h);
-  for (let y = 0; y < h; y += 7) blit(bm, fromMap(tone(BAG_SIDE, bagTone(seed, y, false))), 0, y);
+  const bm = new Bitmap(12, h);
+  for (let y = 0; y < h; y += 14) blit(bm, fromMap(tone(BAG_SIDE, bagTone(seed, y, false))), 0, y);
   return bm;
 }
 
@@ -155,22 +173,57 @@ const SCOPE_TRIPOD = [
   'k...k',
 ];
 
-export const NEST_W = 32;
-export const NEST_H = 48; // sprite canvas; bottom row = footprint bottom
-const BASE_Y = NEST_H - 32; // top of the 32x32 footprint inside the canvas
+export const NEST_W = 64;
+export const NEST_H = 96; // sprite canvas; bottom row = footprint bottom
+const BASE_Y = NEST_H - 64; // top of the 64x64 footprint inside the canvas
 
 // Trooper stand positions (feet) per tier, relative to the canvas.
 export const SQUAD_SLOTS = {
-  t1: [[9, 44], [16, 39], [23, 44]],
-  t2: [[9, 44], [16, 39], [23, 44]],
-  t3: [[8, 42], [16, 37], [24, 42]],
-  t4a: [[7, 42], [15, 43], [23, 42], [11, 36], [20, 36]],
-  t4b: [[11, 41], [21, 41]],
+  t1: [[18, 88], [32, 78], [46, 88]],
+  t2: [[18, 88], [32, 78], [46, 88]],
+  t3: [[16, 84], [32, 74], [48, 84]],
+  t4a: [[14, 84], [30, 86], [46, 84], [22, 72], [40, 72]],
+  t4b: [[22, 82], [42, 82]],
 };
 
 function shadowFloor(bm, x, y, w, h) {
   fill(bm, x, y, w, h, '#000000', 56);
 }
+
+const D = (m) => hd(fromMap(m)); // 2x dressing from the hand-placed 1x maps
+
+// Hand-placed 2x armor plates (rivets + panel seam).
+const PLATE2 = [
+  'kkkkkkkkkkkkkkkkkkkk',
+  'kmmmmmmmmmmmmmmmmmMk',
+  'kmMMMMMMMMMMMMMMMMnk',
+  'kmMmMMMMMMMMMMMmMMnk',
+  'kmMMNMMMMMMMMMMMNMnk',
+  'kmMMMMMMMMMMMMMMMMnk',
+  'kMNNNNNNNNNNNNNNNNnk',
+  'kmmmmmmmmmmmmmmmmMnk',
+  'kmMMMMMMMMMMMMMMMMnk',
+  'kmMmMMMMMMMMMMMmMMnk',
+  'kmMMNMMMMMMMMMMMNMnk',
+  'kmMMMMMMMMMMMMMMMMnk',
+  'knnnnnnnnnnnnnnnnnNk',
+  'kkkkkkkkkkkkkkkkkkkk',
+];
+const PLATE_SMALL2 = [
+  'kkkkkkkkkkkkkk',
+  'kmmmmmmmmmmmMk',
+  'kmMmMMMMMMmMnk',
+  'kmMMNMMMMMMNnk',
+  'kmMMMMMMMMMMnk',
+  'kmMMMMMMMMMMnk',
+  'kMNNNNNNNNNNnk',
+  'kmmmmmmmmmmMnk',
+  'kmMmMMMMMMmMnk',
+  'kmMMNMMMMMMNnk',
+  'knnnnnnnnnnnNk',
+  'kkkkkkkkkkkkkk',
+];
+const P = (m) => fromMap(m);
 
 export function buildNest(tier) {
   const back = new Bitmap(NEST_W, NEST_H);
@@ -178,47 +231,39 @@ export function buildNest(tier) {
   const by = BASE_Y;
   const tall = tier === 't3' || tier === 't4a' || tier === 't4b' ? 1 : 0;
 
-  // inner floor shadow (ambient occlusion under the walls)
-  shadowFloor(back, 5, by + 12, 22, 12);
-  shadowFloor(back, 6, by + 12, 20, 2);
-  // back wall (inner face, in shade)
-  const bw = wall(NEST_W - 4, 1 + tall, true, 3);
-  blit(back, bw, 2, by + 3 - tall * 4);
-  // side walls
-  blit(back, sideWall(20, 1), 0, by + 9);
-  blit(back, sideWall(20, 5), NEST_W - 6, by + 9);
+  shadowFloor(back, 10, by + 24, 44, 24);
+  shadowFloor(back, 12, by + 24, 40, 4);
+  const bw = wall(NEST_W - 8, 1 + tall, true, 3);
+  blit(back, bw, 4, by + 6 - tall * 8);
+  blit(back, sideWall(40, 1), 0, by + 18);
+  blit(back, sideWall(40, 5), NEST_W - 12, by + 18);
 
-  // front wall: one course (two when fortified)
   const fw = wall(NEST_W, 1 + tall, false, 0);
   blit(front, fw, 0, NEST_H - fw.h);
 
   if (tier !== 't1') {
-    // metal plates bolted over the front face
-    const p = fromMap(tall ? PLATE : PLATE_SMALL);
-    blit(front, p, 5, NEST_H - p.h - 1);
-    blit(front, p, NEST_W - 5 - p.w, NEST_H - p.h - 1);
-    blit(back, fromMap(AMMO_CRATE), 21, by + 8);
+    const p = P(tall ? PLATE2 : PLATE_SMALL2);
+    blit(front, p, 10, NEST_H - p.h - 2);
+    blit(front, p, NEST_W - 10 - p.w, NEST_H - p.h - 2);
+    blit(back, D(AMMO_CRATE), 42, by + 16);
   }
   if (tier === 't3' || tier === 't4a') {
-    blit(back, fromMap(ANTENNA), 3, by - 8);
-    blit(back, fromMap(PLATE_SMALL), 12, by - 1);
+    blit(back, D(ANTENNA), 6, by - 16);
+    blit(back, P(PLATE_SMALL2), 24, by - 2);
   }
-  if (tier === 't3') {
-    blit(back, fromMap(BANNER), 25, by - 9);
-  }
+  if (tier === 't3') blit(back, D(BANNER), 50, by - 18);
   if (tier === 't4a') {
-    blit(back, fromMap(ANTENNA), 26, by - 10);
-    const gold = BANNER.map((r) => r.replace(/s/g, 'd'));
-    blit(back, fromMap(gold), 18, by - 11);
-    blit(back, fromMap(PLATE_SMALL), 5, by - 1);
-    blit(back, fromMap(PLATE_SMALL), 20, by - 1);
-    blit(front, fromMap(PLATE_SMALL), 13, NEST_H - 7);
+    blit(back, D(ANTENNA), 52, by - 20);
+    blit(back, D(BANNER.map((r) => r.replace(/s/g, 'd'))), 36, by - 22);
+    blit(back, P(PLATE_SMALL2), 10, by - 2);
+    blit(back, P(PLATE_SMALL2), 40, by - 2);
+    blit(front, P(PLATE_SMALL2), 26, NEST_H - 14);
   }
   if (tier === 't4b') {
-    blit(back, fromMap(POLE), 2, by - 8);
-    blit(back, fromMap(POLE), 28, by - 8);
-    blit(back, fromMap(SCOPE_TRIPOD), 14, by + 5);
-    blit(back, fromMap(CAMO_NET), 1, by - 11);
+    blit(back, D(POLE), 4, by - 16);
+    blit(back, D(POLE), 56, by - 16);
+    blit(back, D(SCOPE_TRIPOD), 28, by + 10);
+    blit(back, D(CAMO_NET), 2, by - 22);
   }
   return { back, front };
 }

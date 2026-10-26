@@ -16,6 +16,7 @@ import { Tutorial } from './tutorial.js';
 import { drawSettings } from './settings.js';
 import { drawDebug } from './debug.js';
 import { FONT5 } from '../art/font.js';
+import { TILE } from '../data/levels/index.js';
 
 const BUILD_KEYS = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i'];
 const SLOT_TYPES = ['rifle', 'rocket', 'flak', 'repeater', 'artillery', 'ion', 'sharpshooter', 'depot'];
@@ -27,7 +28,7 @@ export class GameScreen {
     this.sim = snap ? restore(snap) : createSim({ levelId, difficulty, seed: seed ?? ((Date.now() & 0xffff) + 1) });
     this.level = this.sim.level;
     this.ground = buildGroundLayers(this.level, app.art.tiles.kamino, app.createCanvas);
-    this.cam = new Camera(this.level.w * 16, this.level.h * 16);
+    this.cam = new Camera(this.level.w * TILE, this.level.h * TILE);
     this.fx = new Fx(app.assets, app.audio);
     this.speed = 1;
     this.paused = false;
@@ -51,7 +52,7 @@ export class GameScreen {
     this.resize();
     // start view: centre on the path entry for the first wave
     const p0 = this.level.paths[0].pts[1];
-    this.cam.centerOn(p0[0] - 60, p0[1] + 40);
+    this.cam.centerOn(p0[0] - 120, p0[1] + 80);
     app.audio.playMusic('kamino');
   }
 
@@ -79,7 +80,8 @@ export class GameScreen {
       if (e.type === 'down') {
         if (ui.down(e.id, e.x, e.y)) continue;
         if (this.menu) continue;
-        this.touchIds.set(e.id, { x: e.x, y: e.y, sx: e.x, sy: e.y, ptype: e.ptype, button: e.button, moved: false });
+        this.cam.stop();
+        this.touchIds.set(e.id, { x: e.x, y: e.y, sx: e.x, sy: e.y, ptype: e.ptype, button: e.button, moved: false, t: performance.now(), vx: 0, vy: 0 });
         if (this.touchIds.size === 2) {
           const [a, b] = [...this.touchIds.values()];
           this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y), W0: this.cam.W, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
@@ -98,6 +100,8 @@ export class GameScreen {
           continue;
         }
         const dx = e.x - p.x, dy = e.y - p.y;
+        const now = performance.now(), dtm = Math.max(1, now - p.t) / 1000;
+        p.vx = p.vx * 0.6 + (dx / dtm) * 0.4; p.vy = p.vy * 0.6 + (dy / dtm) * 0.4; p.t = now;
         p.x = e.x; p.y = e.y;
         if (Math.hypot(e.x - p.sx, e.y - p.sy) > 8 * this.app.sc.dpr) p.moved = true;
         if (this.pinch && this.touchIds.size >= 2) {
@@ -129,6 +133,7 @@ export class GameScreen {
           continue;
         }
         if (!p.moved && e.button !== 2) this.tapWorld(e.x, e.y);
+        else if (p.moved && !this.pinch && performance.now() - p.t < 80) this.cam.fling(p.vx, p.vy);
       }
     }
   }
@@ -155,8 +160,8 @@ export class GameScreen {
     // touch: ghost sits above the finger so the finger never hides it
     const off = touch ? 56 * this.app.sc.dpr : 0;
     const w = this.cam.toWorld(dx, dy - off);
-    this.placing.tx = Math.round(w.x / 16 - n / 2);
-    this.placing.ty = Math.round(w.y / 16 - n / 2);
+    this.placing.tx = Math.round(w.x / TILE - n / 2);
+    this.placing.ty = Math.round(w.y / TILE - n / 2);
     this.placing.touch = touch;
     this.placing.valid = canPlace(this.sim, this.placing.type, this.placing.tx, this.placing.ty).ok;
   }
@@ -166,7 +171,7 @@ export class GameScreen {
     this.selId = 0;
     const n = TOWERS[type].size;
     const c = this.cam.toWorld(this.app.sc.dw / 2, this.app.sc.dh / 2);
-    this.placing = { type, tx: Math.round(c.x / 16 - n / 2), ty: Math.round(c.y / 16 - n / 2), valid: false, touch: false, dragging: false };
+    this.placing = { type, tx: Math.round(c.x / TILE - n / 2), ty: Math.round(c.y / TILE - n / 2), valid: false, touch: false, dragging: false };
     const m = this.app.input.mouse;
     if (m.inside && m.type === 'mouse') this.moveGhost(m.x, m.y, false);
     else {
@@ -190,7 +195,7 @@ export class GameScreen {
 
   tapWorld(dx, dy) {
     const w = this.cam.toWorld(dx, dy);
-    const tx = Math.floor(w.x / 16), ty = Math.floor(w.y / 16);
+    const tx = Math.floor(w.x / TILE), ty = Math.floor(w.y / TILE);
     const t = this.s.towers.find((q) => tx >= q.tx && ty >= q.ty && tx < q.tx + TOWERS[q.type].size && ty < q.ty + TOWERS[q.type].size);
     this.selId = t ? t.id : 0;
     this.sellConfirm = 0;
@@ -215,6 +220,7 @@ export class GameScreen {
   update(dt, events) {
     this.time += dt;
     this.handleInput(events);
+    this.cam.update(dt);
     const portrait = this.app.portraitBlocked();
     const tut = this.tutorial?.update();
     // mid-wave tutorial messages pause the action until handled
@@ -292,25 +298,26 @@ export class GameScreen {
 
   viewBounds() {
     const a = this.cam.toWorld(0, 0), b = this.cam.toWorld(this.app.sc.dw, this.app.sc.dh);
-    return { x0: a.x, y0: a.y, x1: b.x, y1: b.y, mapX0: 0, mapY0: 0, mapX1: this.level.w * 16, mapY1: this.level.h * 16 };
+    return { x0: a.x, y0: a.y, x1: b.x, y1: b.y, mapX0: 0, mapY0: 0, mapX1: this.level.w * TILE, mapY1: this.level.h * TILE };
   }
 
   // ------------------------------------------------------------- render --
   render() {
     const app = this.app, r = app.renderer, ui = app.ui;
-    r.begin('#0b1013');
+    r.begin('#1f2c33'); // sea colour beyond the map edge
     const sel = this.selected();
     drawWorld({
       r, A: app.assets, sim: this.sim, fx: this.fx, cam: this.cam, ground: this.ground, alpha: this.alpha ?? 1,
-      sel, placing: this.placing, settings: app.save.settings, waterFrame: Math.floor(this.time * 3) % 4,
+      sel, placing: this.placing, settings: app.save.settings, waterFrame: Math.floor(this.time * 6), time: this.time,
     });
     if (this.placing) {
       const p = this.placing;
       const t = { type: p.type, tier: 't1', tx: p.tx, ty: p.ty, aim: Math.PI / 2, id: -1 };
-      drawTower(r, app.assets, t, 9, 0.65);
+      drawTower(r, app.assets, t, 9, 0.65, t.aim, this.time);
     }
     // weather (screen space, world-independent)
     r.ui();
+    this.fx.drawTexts(r, (x, y) => { const sp = this.cam.toScreen(x, y); return ui.toUI(sp.x, sp.y); });
     this.drawRain(r);
     if (this.fx.lightning > 0) r.rect(0, 0, ui.vw, ui.vh, '#dff4ff', this.fx.lightning * 0.5);
     ui.beginFrame();
@@ -327,7 +334,7 @@ export class GameScreen {
       const d = this.fx.rain[i];
       const y = ((d.y * (vh + 20) + t * 220 * d.s) % (vh + 20)) - 10;
       const x = ((d.x * (vw + 40) - t * 60 * d.s) % (vw + 40) + vw + 40) % (vw + 40) - 20;
-      r.spr(drop, x, y, 0.8);
+      r.hi(drop, x, y, 0.8);
     }
   }
 
@@ -363,9 +370,9 @@ export class GameScreen {
       for (const g of pv.groups) {
         const set = A.enemies[g.type];
         const ref = set.walk ? set.walk[1] : set.frames[0][0];
-        const w = set.walk ? set.w : 20;
+        const w = (set.walk ? set.w : set.size) / 2, hh = (set.walk ? set.h : set.size * 0.8) / 2;
         const clipW = Math.min(w, 16);
-        r.spr(ref, x - ((w - clipW) >> 1), py + ph - 3 - (set.walk ? set.h : 16));
+        r.hi(ref, x - Math.round((w - clipW) / 2), py + ph - 3 - Math.round(hh));
         r.text(`x${g.count}`, x + clipW, py + ph - 9, COLORS.dim, { font: FONT5 });
         x += clipW + 14;
         if (x > L + pw - 30) break;
@@ -416,9 +423,7 @@ export class GameScreen {
       }
       const ic = this.slotIcon(type);
       const dy = active ? 1 : 0;
-      r.alpha(afford ? 1 : 0.45);
-      r.spr(ic.ref, x + ((BT - ic.w) >> 1), y0 + Math.max(1, BT - 9 - ic.h) + dy);
-      r.alpha(1);
+      r.hi(ic.ref, x + ((BT - ic.w) >> 1), y0 + Math.max(1, BT - 9 - ic.h) + dy, afford ? 1 : 0.45);
       r.rect(x + 2, y0 + BT - 10 + dy, BT - 4, 7, '#0c1116', 0.75);
       r.text(String(cost), x + BT / 2, y0 + BT - 9 + dy, afford ? COLORS.warn : COLORS.bad, { font: FONT5, align: 'center', shadow: null });
       if (BT >= 26) r.text(BUILD_KEYS[i].toUpperCase(), x + 3, y0 + 2 + dy, COLORS.faint, { font: FONT5, shadow: null });
@@ -427,10 +432,10 @@ export class GameScreen {
     // --- placement confirm (touch)
     if (this.placing && this.placing.touch) {
       const n = TOWERS[this.placing.type].size;
-      const sp = this.cam.toScreen((this.placing.tx + n) * 16, this.placing.ty * 16);
+      const sp = this.cam.toScreen((this.placing.tx + n) * TILE, this.placing.ty * TILE);
       const p = ui.toUI(sp.x, sp.y);
       let cx = Math.round(p.x + 6);
-      if (cx + T > R) cx = Math.round(ui.toUI(this.cam.toScreen(this.placing.tx * 16, 0).x, 0).x - T - 6);
+      if (cx + T > R) cx = Math.round(ui.toUI(this.cam.toScreen(this.placing.tx * TILE, 0).x, 0).x - T - 6);
       const cy = Math.round(Math.min(Math.max(top + T + 4, p.y - 4), y0 - 2 * T - 10));
       if (ui.button('hud:ok', cx, cy, T, T, { icon: A.icons.check, style: 'good', disabled: !this.placing.valid })) this.confirmPlace();
       if (ui.button('hud:no', cx, cy + T + 4, T, T, { icon: A.icons.cross, style: 'bad' })) this.placing = null;
@@ -490,7 +495,7 @@ export class GameScreen {
       const r = this.app.renderer;
       const key = `slotIcon:${type}`;
       const ref = r.cached(key, () => this.app.makeTowerIcon(type));
-      this.icons[type] = { ref, w: ref.w, h: ref.h };
+      this.icons[type] = { ref, w: Math.round(ref.w / 2), h: Math.round(ref.h / 2) };
     }
     return this.icons[type];
   }
@@ -578,7 +583,7 @@ export class GameScreen {
     r.panel(x, y, w, h, { title: true });
     ui.block('tut:bg', x, y, w, h);
     const flick = 0.75 + 0.25 * Math.sin(this.time * 31) * Math.sin(this.time * 7);
-    r.spr(app.assets.hologram, x + 4, y + 4, flick);
+    r.hi(app.assets.hologram, x + 3, y + 3, flick);
     lines.forEach((l, i) => r.text(l, x + 32, y + 5 + i * 9, COLORS.accent));
     if (needOk && ui.button('tut:ok', x + w - 50, y + h - T - 4, 46, T, { label: 'OK', style: 'accent' })) this.tutorial.ack();
   }

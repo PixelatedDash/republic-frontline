@@ -9,7 +9,7 @@ import { DAMAGE } from '../../src/data/rules.js';
 import { ENEMIES } from '../../src/data/enemies.js';
 import { wavePreview, canPlace, build, upgrade, setTargeting, towerCenter } from '../../src/sim/sim.js';
 
-const SAMPLE = 8;
+const SAMPLE = 16;
 
 // Path/lane sample points, cached per level.
 const cache = new Map();
@@ -86,7 +86,7 @@ function layerDps(sim, layer) {
 // Splash weapons hit several droids in a column; swarms make that count.
 function splashTargets(st, threat) {
   if (!st.splash) return 1;
-  return 1 + (0.6 + threat.swarmShare * 2) * Math.min(1.5, st.splash / 16);
+  return 1 + (0.6 + threat.swarmShare * 2) * Math.min(1.5, st.splash / 32);
 }
 
 function chooseBranch(t, threat) {
@@ -126,7 +126,7 @@ export function balancedBot() {
         const cov = coverage(sim, t.type, t.tx, t.ty, st.range, layer);
         let value = (towerDps(t.type, tier) - towerDps(t.type, t.tier)) * Math.min(1, cov / 12) * typeEff(TOWERS[t.type].dtype, threat);
         if (layer === 'air') value *= threat.air ? 2 : 0.3;
-        value *= splashTargets(st, threat) * (1 + (st.range - TOWERS[t.type].tiers[t.tier].range) / 40);
+        value *= splashTargets(st, threat) * (1 + (st.range - TOWERS[t.type].tiers[t.tier].range) / 80);
         options.push({ kind: 'upgrade', id: t.id, tier, cost: st.cost, value });
       }
       if (!options.length) return;

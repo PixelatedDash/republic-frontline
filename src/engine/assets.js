@@ -3,7 +3,7 @@
 // each level's ground layer (4 water frames) to canvases.
 
 import { silhouette, toCanvas, fromMap } from '../art/bitmap.js';
-import { MUZZLE_SMALL } from '../art/sprites/troopers.js';
+import { MUZZLE_SMALL, MUZZLE_SMALL_B } from '../art/sprites/troopers.js';
 import { renderGround } from '../art/tilemap.js';
 import { icon, ICONS, logoText } from '../art/ui.js';
 import { shadowBlob } from '../art/vfx.js';
@@ -17,7 +17,7 @@ export function buildAssets(art, atlas) {
     const troopers = {};
     for (const d of DIRS8) {
       const mk = (t) => ({ ref: A(t.bm), mx: t.mx, my: t.my });
-      troopers[d] = { idle: mk(r.troopers[d].idle), fire: mk(r.troopers[d].fire) };
+      troopers[d] = { idle: mk(r.troopers[d].idle), breathe: mk(r.troopers[d].breathe), fire: mk(r.troopers[d].fire) };
     }
     towers.rifle[tier] = { back: A(r.back), front: A(r.front), troopers, slots: r.slots, w: r.w, h: r.h };
   }
@@ -54,15 +54,17 @@ export function buildAssets(art, atlas) {
   for (const [k, v] of Object.entries(art.tiles.kamino.props)) props[k] = { ref: A(v), w: v.w, h: v.h };
 
   const icons = {};
-  for (const n of Object.keys(ICONS)) icons[n] = A(icon(n));
+  // icons are 2x detail: drawn through the renderer's HI layer in the UI
+  for (const n of Object.keys(ICONS)) icons[n] = Object.assign(A(icon(n)), { hi: 2 });
 
   const shadows = {};
-  for (let w = 4; w <= 34; w += 2) shadows[w] = A(shadowBlob(w, w > 16 ? 5 : 3, 80));
+  for (let w = 6; w <= 68; w += 2) shadows[w] = A(shadowBlob(w, w > 40 ? 10 : w > 20 ? 7 : 5, 80));
 
   const x = art.extras;
   return {
     towers, enemies, vfx, props, icons, shadows,
     flashSmall: A(fromMap(MUZZLE_SMALL)),
+    flashSmallB: A(fromMap(MUZZLE_SMALL_B)),
     proj: { rocket: all(x.rocket), missile: all(x.missile), shell: A(x.shell) },
     portrait: A(x.portrait), hologram: A(x.hologram),
     hologramSize: { w: x.hologram.w, h: x.hologram.h },
@@ -75,10 +77,10 @@ export function buildAssets(art, atlas) {
 }
 
 export function shadowFor(assets, w) {
-  const k = Math.max(4, Math.min(34, (Math.round(w / 2) * 2)));
+  const k = Math.max(6, Math.min(68, (Math.round(w / 2) * 2)));
   return assets.shadows[k];
 }
 
 export function buildGroundLayers(level, tiles, createCanvas) {
-  return [0, 1, 2, 3].map((f) => toCanvas(renderGround(level.grid, tiles, f), createCanvas));
+  return Array.from({ length: tiles.water.length }, (_, f) => toCanvas(renderGround(level.grid, tiles, f), createCanvas));
 }

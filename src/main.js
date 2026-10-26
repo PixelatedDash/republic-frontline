@@ -125,7 +125,7 @@ app.finishLevel = (sim) => {
 app.makeTowerIcon = (type) => {
   const bm = type === 'rifle' ? composeRifle(app.art.towers.rifle.t1, 'S') : composeTurret(app.art.towers[type].t1, 3);
   const b = bounds(bm);
-  const w = Math.min(26, b.w), h = Math.min(20, b.h);
+  const w = Math.min(52, b.w), h = Math.min(40, b.h);
   return crop(bm, b.x + ((b.w - w) >> 1), b.y + b.h - h, w, h);
 };
 
@@ -143,12 +143,17 @@ function frame(t) {
   last = t;
   app.perf.frame(dtMs);
   const events = app.input.drain();
-  if (app.screen) {
+  requestAnimationFrame(frame);
+  if (!app.screen) return;
+  try {
     if (app.screen instanceof GameScreen && app.save) app.save.stats.playSeconds += dtMs / 1000;
     app.screen.update(dtMs / 1000, events);
     app.screen.render();
+  } catch (e) {
+    // keep the loop alive; report each distinct error once
+    const key = String(e && e.stack).slice(0, 200);
+    if (!app.errors?.has(key)) { (app.errors ||= new Set()).add(key); console.error(e); }
   }
-  requestAnimationFrame(frame);
 }
 
 async function boot() {

@@ -7,7 +7,7 @@ import { buildTrooperDroid, buildRushDroid, buildScuttler, buildShieldDroid, bui
 import { buildKaminoTiles } from './tilemap.js';
 import { buildVfx, hologram } from './vfx.js';
 import { fromMap, silhouette, mirrorX } from './bitmap.js';
-import { rotations } from './rotsprite.js';
+import { rotations, hd } from './rotsprite.js';
 import * as X from './sprites/extras.js';
 import { REPUBLIC_EMBLEM, SEPARATIST_EMBLEM } from './sprites/emblems.js';
 
@@ -31,16 +31,16 @@ function artSteps() {
     })],
     ['tiles', () => ({ kamino: buildKaminoTiles() })],
     ['vfx', () => buildVfx()],
-    ['emblems', () => ({ republic: fromMap(REPUBLIC_EMBLEM), separatist: fromMap(SEPARATIST_EMBLEM) })],
+    ['emblems', () => ({ republic: hd(fromMap(REPUBLIC_EMBLEM)), separatist: hd(fromMap(SEPARATIST_EMBLEM)) })],
     ['extras', () => {
-      const portrait = fromMap(X.COMMANDER);
+      const portrait = hd(fromMap(X.COMMANDER));
       return {
-        rocket: rotations(fromMap(X.ROCKET_PROJ), 16, 3.5, 1.5, 9),
-        missile: rotations(fromMap(X.MISSILE_PROJ), 16, 3, 1.5, 9),
-        shell: fromMap(X.FLAK_SHELL),
+        rocket: rotations(hd(fromMap(X.ROCKET_PROJ)), 32, 7, 3, 18, 4),
+        missile: rotations(hd(fromMap(X.MISSILE_PROJ)), 32, 6, 3, 18, 4),
+        shell: hd(fromMap(X.FLAK_SHELL), false),
         portrait,
         hologram: hologram(portrait),
-        flyby: rotations(fromMap(X.FLYBY), 16, 7.5, 5.5, 18),
+        flyby: rotations(hd(fromMap(X.FLYBY)), 16, 15, 11, 36, 4),
       };
     }],
   ];

@@ -111,9 +111,8 @@ export class UI {
     const dy = pressed ? 1 : 0;
     const a = disabled ? 0.45 : 1;
     if (icon) {
-      r.alpha(a);
-      r.spr(icon, x + ((w - icon.w) >> 1), y + ((h - 3 - icon.h) >> 1) + dy);
-      r.alpha(1);
+      const iw = icon.hi ? icon.w / icon.hi : icon.w, ih = icon.hi ? icon.h / icon.hi : icon.h;
+      r.spr(icon, x + Math.round((w - iw) / 2), y + Math.round((h - 3 - ih) / 2) + dy, a);
     }
     if (label) {
       const dark = st === 'accent' || st === 'good';

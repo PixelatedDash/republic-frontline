@@ -26,11 +26,12 @@ export class Fx {
     this.reduce = false;
     this.damageNumbers = false;
     this.towerFire = new Map(); // tower id -> seconds since last shot
+    this.aim = new Map(); // tower id -> displayed (smoothed) aim angle
     this.lightning = 0;
     this.timers = { lightning: 6, flyby: 12, artillery: 5, smoke: 0 };
     this.flybys = [];
     this.uiEvents = []; // consumed by the HUD (banners, leaks, income)
-    this.rain = Array.from({ length: 140 }, () => ({ x: this.rng.range(0, 1), y: this.rng.range(0, 1), s: this.rng.range(0.8, 1.2) }));
+    this.rain = Array.from({ length: 220 }, () => ({ x: this.rng.range(0, 1), y: this.rng.range(0, 1), s: this.rng.range(0.8, 1.2) }));
   }
 
   get mult() {
@@ -76,28 +77,28 @@ export class Fx {
           break;
         case 'hit': {
           if (e.shield) {
-            this.spawn(v.shield, e.x, e.y - (e.air ? 24 : 8), { fd: 0.05 });
+            this.spawn(v.shield, e.x, e.y - (e.air ? 48 : 18), { fd: 0.045 });
             this.sfx('shieldHum', { vol: 0.6 });
           } else if (e.armor) {
-            this.spawn(v.sparksMetal, e.x, e.y - (e.air ? 24 : 6), { fd: 0.04, optional: true });
+            this.spawn(v.sparksMetal, e.x, e.y - (e.air ? 48 : 12), { fd: 0.04, optional: true });
             this.sfx('armorClank', { vol: 0.6 });
           } else if (e.dtype === 'blaster') {
-            this.spawn(v.sparksRep, e.x + this.rng.range(-2, 2), e.y - (e.air ? 24 : 6) + this.rng.range(-2, 2), { fd: 0.04, glow: v.glowRep, glowA: 0.6 });
+            this.spawn(v.sparksRep, e.x + this.rng.range(-4, 4), e.y - (e.air ? 48 : 12) + this.rng.range(-4, 4), { fd: 0.035, glow: v.glowRep, glowA: 0.6 });
           }
           if (this.damageNumbers && e.dmg >= 1) {
-            this.spawn(null, e.x, e.y - 14, { text: String(Math.round(e.dmg)) + (e.crit ? '!' : ''), color: e.crit ? '#ffd27a' : e.shield ? '#e2a6ff' : '#ffffff', vy: -14, life: 0.7, fade: true, layer: 2 });
+            this.spawn(null, e.x, e.y - (e.air ? 60 : 30), { text: String(Math.round(e.dmg)) + (e.crit ? '!' : ''), color: e.crit ? '#ffd27a' : e.shield ? '#e2a6ff' : '#ffffff', vy: -28, life: 0.7, fade: true, layer: 2 });
           }
           break;
         }
         case 'explode': {
           const big = e.size === 'm';
           const frames = big ? v.expM : v.expS;
-          this.spawn(frames, e.x, e.y - (e.air ? 22 : 4), { fd: 0.045, glow: v.glowFire, glowA: big ? 1 : 0.7 });
+          this.spawn(frames, e.x, e.y - (e.air ? 44 : 8), { fd: 0.038, glow: v.glowFire, glowA: big ? 1 : 0.7 });
           if (!e.air) {
             this.decal(v.scorch[big ? 1 : 0], e.x, e.y);
-            this.spawn(v.smoke, e.x + this.rng.range(-3, 3), e.y - 6, { fd: 0.12, vy: -6, vx: this.rng.range(-3, 3), optional: true });
+            this.spawn(v.smoke, e.x + this.rng.range(-6, 6), e.y - 12, { fd: 0.1, vy: -12, vx: this.rng.range(-6, 6), optional: true });
             for (let i = 0; i < (big ? 3 : 2); i++)
-              this.spawn([v.debris[this.rng.int(0, v.debris.length - 1)]], e.x, e.y - 4, { vx: this.rng.range(-40, 40), vy: this.rng.range(-60, -25), ay: 180, life: 0.45, optional: true });
+              this.spawn([v.debris[this.rng.int(0, v.debris.length - 1)]], e.x, e.y - 8, { vx: this.rng.range(-80, 80), vy: this.rng.range(-120, -50), ay: 360, life: 0.45, optional: true });
           }
           this.addShake(big ? 2 : 1);
           if (e.kind === 'flak') this.sfx('flak', { vol: 0.8 });
@@ -111,9 +112,9 @@ export class Fx {
           const c = this.corpses.acquire();
           if (c) {
             c.type = e.type; c.face = e.face; c.t = 0; c.x = e.x; c.y = e.y; c.air = e.air;
-            c.alt = e.air ? 22 : 0; c.vx = e.face * 25; c.life = e.air ? 0.7 : 5.5;
+            c.alt = e.air ? 44 : 0; c.vx = e.face * 50; c.life = e.air ? 0.7 : 5.5;
           }
-          this.spawn(v.sparksMetal, e.x, e.y - 8, { fd: 0.05 });
+          this.spawn(v.sparksMetal, e.x, e.y - (e.air ? 48 : 16), { fd: 0.05 });
           this.sfx('droidDeath', { vol: 0.6 });
           break;
         }
@@ -133,11 +134,11 @@ export class Fx {
           break;
         case 'build':
         case 'upgrade':
-          for (let i = 0; i < 3; i++) this.spawn(v.smoke, e.x + this.rng.range(-8, 8), e.y + 4, { fd: 0.08, vx: this.rng.range(-8, 8), vy: -4 });
+          for (let i = 0; i < 4; i++) this.spawn(v.smoke, e.x + this.rng.range(-16, 16), e.y + 8, { fd: 0.07, vx: this.rng.range(-16, 16), vy: -8 });
           this.sfx(e.t === 'build' ? 'place' : 'upgrade');
           break;
         case 'sell':
-          this.spawn(v.smoke, e.x, e.y + 2, { fd: 0.08 });
+          this.spawn(v.smoke, e.x, e.y + 4, { fd: 0.07 });
           this.sfx('sell');
           break;
         case 'deploy':
@@ -156,6 +157,17 @@ export class Fx {
   // ------------------------------------------------------------- update --
   update(dt, sim, view) {
     for (const [id, t] of this.towerFire) this.towerFire.set(id, t + dt);
+    // turrets turn toward their target at a fixed rate (visual only)
+    if (sim) for (const t of sim.state.towers) {
+      let a = this.aim.get(t.id);
+      if (a === undefined) { this.aim.set(t.id, t.aim); continue; }
+      let d = t.aim - a;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      const step = 10 * Math.max(dt, 1 / 120);
+      a += Math.abs(d) <= step ? d : Math.sign(d) * step;
+      this.aim.set(t.id, a);
+    }
     const ps = this.particles;
     for (let i = ps.count - 1; i >= 0; i--) {
       const p = ps.items[i];
@@ -178,9 +190,9 @@ export class Fx {
       c.t += dt;
       if (c.air) {
         c.x += c.vx * dt;
-        c.alt = Math.max(0, c.alt - 40 * dt);
+        c.alt = Math.max(0, c.alt - 80 * dt);
         if (c.t >= c.life) {
-          this.spawn(this.a.vfx.expS, c.x, c.y - 2, { fd: 0.05, glow: this.a.vfx.glowFire });
+          this.spawn(this.a.vfx.expS, c.x, c.y - 4, { fd: 0.04, glow: this.a.vfx.glowFire });
           this.sfx('explosionS', { vol: 0.6 });
         }
       }
@@ -193,7 +205,7 @@ export class Fx {
         this.trailT = 0;
         for (const p of sim.state.projectiles)
           if ((p.kind === 'rocket' || p.kind === 'missile') && p.delay <= 0)
-            this.spawn(this.a.vfx.smoke, p.x, p.y, { fd: 0.07, optional: true, vy: -3 });
+            this.spawn(this.a.vfx.smoke, p.x, p.y, { fd: 0.06, optional: true, vy: -6 });
       }
     }
     this.shake = Math.max(0, this.shake - dt * 14);
@@ -216,7 +228,7 @@ export class Fx {
       const y = this.rng.range(view.y0 + 20, view.y1 - 20);
       const dir = fromLeft ? (this.rng.next() < 0.5 ? 0 : 15) : (this.rng.next() < 0.5 ? 8 : 7);
       const a = (dir / 16) * Math.PI * 2;
-      this.flybys.push({ x: fromLeft ? view.x0 - 30 : view.x1 + 30, y, vx: Math.cos(a) * 140, vy: Math.sin(a) * 140, dir, t: 0 });
+      this.flybys.push({ x: fromLeft ? view.x0 - 60 : view.x1 + 60, y, vx: Math.cos(a) * 280, vy: Math.sin(a) * 280, dir, t: 0 });
     }
     for (let i = this.flybys.length - 1; i >= 0; i--) {
       const f = this.flybys[i];
@@ -230,7 +242,7 @@ export class Fx {
     }
     if (this.quality < 2 && (T.smoke -= dt) <= 0) {
       T.smoke = this.rng.range(0.6, 1.4);
-      this.spawn(v.smokeBig, this.rng.range(view.x0, view.x1), this.rng.range(view.y0, view.y1), { fd: 0.6, vx: this.rng.range(4, 9), vy: -2, optional: true, fade: true, layer: 1 });
+      this.spawn(v.smokeBig, this.rng.range(view.x0, view.x1), this.rng.range(view.y0, view.y1), { fd: 0.55, vx: this.rng.range(8, 18), vy: -4, optional: true, fade: true, layer: 1 });
     }
   }
 
@@ -244,23 +256,40 @@ export class Fx {
     }
   }
 
-  // Corpses: death frames (flash -> stagger -> collapse -> debris that fades).
+  // Corpses: flash -> recoil -> stagger -> falling -> collapsed -> debris (fades).
   drawCorpses(r) {
     const cs = this.corpses, E = this.a.enemies;
+    const T = [0.05, 0.11, 0.2, 0.3, 0.6];
     for (let i = 0; i < cs.count; i++) {
       const c = cs.items[i];
       if (c.air) {
-        const set = E.fighter.death;
-        const f = set[Math.min(set.length - 1, 1 + Math.floor(c.t / 0.12) % (set.length - 1))];
-        r.spr(E.fighter.shadows[0], c.x - 10 + (c.alt >> 2), c.y - 10 + 2, 0.5);
-        r.spr(c.t < 0.05 ? set[0] : f, c.x - 10, c.y - 10 - c.alt);
+        const set = E.fighter.death, h = E.fighter.size >> 1;
+        const f = set[Math.min(set.length - 1, 1 + Math.floor(c.t / 0.1) % (set.length - 1))];
+        r.spr(E.fighter.shadows[0], c.x - h + (c.alt >> 2), c.y - h + 4, 0.5);
+        r.spr(c.t < 0.05 ? set[0] : f, c.x - h, c.y - h - c.alt);
         continue;
       }
       const set = E[c.type];
       const frames = c.face < 0 ? set.deathW : set.death;
-      const idx = c.t < 0.06 ? 0 : c.t < 0.22 ? 1 : c.t < 0.5 ? 2 : 3;
+      let idx = 0;
+      while (idx < T.length && c.t >= T[idx]) idx++;
       const a = c.t > c.life - 1 ? Math.max(0, c.life - c.t) : 1;
-      r.spr(frames[idx], c.x - (set.w >> 1), c.y - set.h + 1, a);
+      r.spr(frames[Math.min(idx, frames.length - 1)], c.x - (set.w >> 1), c.y - set.h + 1, a);
+    }
+  }
+
+  aimOf(t) {
+    return this.aim.get(t.id) ?? t.aim;
+  }
+
+  // Damage numbers live in the UI layer so they stay legible at any zoom.
+  drawTexts(r, toUI) {
+    const ps = this.particles;
+    for (let i = 0; i < ps.count; i++) {
+      const p = ps.items[i];
+      if (!p.text) continue;
+      const u = toUI(p.x, p.y);
+      r.text(p.text, u.x, u.y, p.color, { font: FONT5, align: 'center', shadow: '#101217' });
     }
   }
 
@@ -270,10 +299,7 @@ export class Fx {
       const p = ps.items[i];
       if (p.layer !== layer) continue;
       const a = p.fade ? 1 - p.t / p.life : 1;
-      if (p.text) {
-        r.text(p.text, p.x, p.y, p.color, { font: FONT5, align: 'center', shadow: '#101217' });
-        continue;
-      }
+      if (p.text) continue;
       if (!p.frames) continue;
       const f = Array.isArray(p.frames) ? p.frames[Math.min(p.frames.length - 1, Math.floor(p.t / p.fd))] : p.frames;
       if (layer === 3) continue; // glow-only particles
@@ -282,7 +308,7 @@ export class Fx {
   }
 
   // Additive pass: glows of particles + projectile glows, batched.
-  drawGlows(r, sim) {
+  drawGlows(r, sim, alpha = 1) {
     r.beginAdd();
     const ps = this.particles;
     for (let i = 0; i < ps.count; i++) {
@@ -296,7 +322,8 @@ export class Fx {
       for (const p of sim.state.projectiles) {
         if (p.delay > 0) continue;
         const g = p.kind === 'bolt' ? v.glowRep : p.kind === 'flak' ? v.glowFire : null;
-        if (g) r.spr(g, p.x - (g.w >> 1), p.y - (g.h >> 1), p.kind === 'flak' ? 0.5 : 0.8);
+        const x = p.px + (p.x - p.px) * alpha, y = p.py + (p.y - p.py) * alpha;
+        if (g) r.spr(g, x - (g.w >> 1), y - (g.h >> 1), p.kind === 'flak' ? 0.5 : 0.8);
       }
     }
     r.endAdd();
@@ -304,8 +331,8 @@ export class Fx {
 
   drawFlybys(r) {
     for (const f of this.flybys) {
-      r.spr(this.a.flybyShadow[f.dir], f.x - 9 + 24, f.y - 9 + 60, 0.6);
-      r.spr(this.a.flyby[f.dir], f.x - 9, f.y - 9);
+      r.spr(this.a.flybyShadow[f.dir], f.x - 18 + 48, f.y - 18 + 120, 0.6);
+      r.spr(this.a.flyby[f.dir], f.x - 18, f.y - 18);
     }
   }
 

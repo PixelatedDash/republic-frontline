@@ -26,25 +26,40 @@ export function scale2x(src) {
 }
 
 // Rotate `src` by `angle` radians around pivot (px, py) in source pixels.
-// Returns a size x size bitmap whose center is the pivot.
-export function rotSprite(src, angle, px = src.w / 2, py = src.h / 2, size = 0) {
-  const N = 8;
-  const big = scale2x(scale2x(scale2x(src)));
-  const out = size || Math.ceil(Math.hypot(src.w, src.h)) + 2;
+// Returns a size x size bitmap whose center is the pivot. `n` = upscale
+// factor (8 = classic RotSprite; 4 is enough for 2x-detail sprites).
+// Output pixels outside the sprite's bounding circle are skipped.
+const bigCache = new WeakMap();
+export function rotSprite(src, angle, px = src.w / 2, py = src.h / 2, size = 0, n = 8) {
+  const N = n;
+  let big = bigCache.get(src)?.[N];
+  if (!big) {
+    big = N === 8 ? scale2x(scale2x(scale2x(src))) : N === 4 ? scale2x(scale2x(src)) : scale2x(src);
+    const c = bigCache.get(src) || {};
+    c[N] = big;
+    bigCache.set(src, c);
+  }
+  // farthest opaque pixel from the pivot
+  let r2 = 0;
+  for (let y = 0; y < src.h; y++)
+    for (let x = 0; x < src.w; x++)
+      if (src.d[y * src.w + x] >>> 24) r2 = Math.max(r2, (x + 0.5 - px) ** 2 + (y + 0.5 - py) ** 2);
+  const rad = Math.sqrt(r2) + 1.5;
+  const out = size || Math.ceil(rad * 2) + 2;
   const res = new Bitmap(out, out);
   const cos = Math.cos(angle), sin = Math.sin(angle);
   const half = out / 2;
   const counts = new Map();
+  const half2 = (N * N) / 2;
   for (let oy = 0; oy < out; oy++)
     for (let ox = 0; ox < out; ox++) {
+      if ((ox + 0.5 - half) ** 2 + (oy + 0.5 - half) ** 2 > rad * rad) continue;
       counts.clear();
       let clear = 0;
-      // Sample the 8x8 sub-grid of this output pixel in the upscaled space.
       for (let sy = 0; sy < N; sy++)
         for (let sx = 0; sx < N; sx++) {
           const dx = ox - half + (sx + 0.5) / N;
           const dy = oy - half + (sy + 0.5) / N;
-          // inverse rotation into source space
           const ux = cos * dx + sin * dy + px;
           const uy = -sin * dx + cos * dy + py;
           const bx = Math.floor(ux * N), by = Math.floor(uy * N);
@@ -53,9 +68,9 @@ export function rotSprite(src, angle, px = src.w / 2, py = src.h / 2, size = 0) 
           if (!(p >>> 24)) { clear++; continue; }
           counts.set(p, (counts.get(p) || 0) + 1);
         }
-      if (clear > (N * N) / 2) continue;
+      if (clear > half2) continue;
       let best = 0, bn = -1;
-      for (const [p, n] of counts) if (n > bn) { bn = n; best = p; }
+      for (const [p, c] of counts) if (c > bn) { bn = c; best = p; }
       res.d[oy * out + ox] = best;
     }
   return cleanOrphans(res);
@@ -63,8 +78,15 @@ export function rotSprite(src, angle, px = src.w / 2, py = src.h / 2, size = 0) 
 
 // Build `dirs` evenly spaced rotations. Direction 0 points east (+x),
 // increasing clockwise in screen space (y down).
-export function rotations(src, dirs = 16, px, py, size) {
+export function rotations(src, dirs = 16, px, py, size, n = 8) {
   const frames = [];
-  for (let i = 0; i < dirs; i++) frames.push(rotSprite(src, (i / dirs) * Math.PI * 2, px, py, size));
+  for (let i = 0; i < dirs; i++) frames.push(rotSprite(src, (i / dirs) * Math.PI * 2, px, py, size, n));
   return frames;
+}
+
+// 2x upscale that keeps pixel-art character: Scale2x, then 1px outlines.
+import { thinOutline, rimLight } from './bitmap.js';
+export function hd(src, rim = true) {
+  const b = thinOutline(scale2x(src));
+  return rim ? rimLight(b) : b;
 }

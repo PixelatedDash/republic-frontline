@@ -4,6 +4,7 @@
 import { Bitmap, blit, fromMap, rgba, pack, outline as addOutline } from './bitmap.js';
 import { UI, UI_ACCENT, UI_GOOD, UI_BAD, UI_WARN, REPUBLIC_BOLT } from './palettes.js';
 import { drawText, measure, FONT7 } from './font.js';
+import { hd } from './rotsprite.js';
 
 // UI legend: digits = UI ramp (1 light .. 8 dark).
 export const UI_LEGEND = {
@@ -103,8 +104,10 @@ export const ICONS = {
   starEmpty: ['....k....', '...k5k...', 'kkkk55kkk', 'k5555556k', '.k55566k.', '..k566k..', '.k56kk6k.', '.k6k..k6k', '.kk....kk'],
 };
 
+// Icons are hand-placed at UI scale and shown at 2x detail (Scale2x +
+// 1px outlines) through the renderer's HI layer.
 export function icon(name) {
-  return fromMap(ICONS[name], UI_LEGEND);
+  return hd(fromMap(ICONS[name], UI_LEGEND));
 }
 
 // Range circle: 2px ring (light over dark) + sparse dithered fill.
@@ -117,22 +120,23 @@ export function rangeCircle(r, { color = REPUBLIC_BOLT[2], min = 0, valid = true
   for (let y = 0; y < s; y++)
     for (let x = 0; x < s; x++) {
       const d = Math.hypot(x - c, y - c);
-      if (d <= r - 0.5 && (x + y) % 2 === 0 && d > min + 0.5) bm.set(x, y, fillC);
-      if (Math.abs(d - r) < 0.5) bm.set(x, y, ring);
-      else if (Math.abs(d - (r - 1)) < 0.5) bm.set(x, y, ringDark);
+      if (d <= r - 0.5 && (x + y) % 2 === 0 && (y % 2 === 0) && d > min + 0.5) bm.set(x, y, fillC);
+      if (Math.abs(d - r) < 0.5 || Math.abs(d - (r - 1)) < 0.5) bm.set(x, y, ring);
+      else if (Math.abs(d - (r - 2)) < 0.5) bm.set(x, y, ringDark);
       if (min && Math.abs(d - min) < 0.5) bm.set(x, y, rgba(UI_WARN[0], 200));
     }
   return bm;
 }
 
-export function gridCell(valid) {
-  const bm = new Bitmap(16, 16);
+export function gridCell(valid, size = 32) {
+  const bm = new Bitmap(size, size);
+  const L = size - 1, C = Math.round(size * 0.2);
   const edge = rgba(valid ? UI_GOOD[0] : UI_BAD[0], 200);
   const body = rgba(valid ? UI_GOOD[1] : UI_BAD[1], 70);
-  for (let y = 0; y < 16; y++)
-    for (let x = 0; x < 16; x++) {
-      const e = x === 0 || y === 0 || x === 15 || y === 15;
-      const corner = (x < 3 || x > 12) && (y < 3 || y > 12);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const e = x <= 1 || y <= 1 || x >= L - 1 || y >= L - 1;
+      const corner = (x < C || x > L - C) && (y < C || y > L - C);
       if (e && corner) bm.set(x, y, edge);
       else if (!e) bm.set(x, y, body);
     }
@@ -140,10 +144,10 @@ export function gridCell(valid) {
 }
 
 // Faint full-map build grid (dots at tile corners).
-export function gridDots(w, h) {
+export function gridDots(w, h, step = 32) {
   const bm = new Bitmap(w, h);
   const c = rgba('#e6ece9', 50);
-  for (let y = 0; y < h; y += 16) for (let x = 0; x < w; x += 16) { bm.set(x, y, c); bm.set(x + 1, y, c); bm.set(x, y + 1, c); }
+  for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) { bm.set(x, y, c); bm.set(x + 1, y, c); bm.set(x, y + 1, c); bm.set(x - 1, y, c); bm.set(x, y - 1, c); }
   return bm;
 }
 

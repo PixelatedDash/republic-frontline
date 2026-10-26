@@ -232,3 +232,48 @@ export function strip(frames, gap = 0) {
   }
   return out;
 }
+
+// After a 2x upscale, outlines are 2px thick. Collapse every outline run to
+// 1px: an outline pixel that does not touch transparency is dropped when the
+// outline continues directly above or left of it (it becomes the adjacent
+// fill colour). Silhouette edges keep their outer ring.
+export function thinOutline(src, hex = '#101217') {
+  const k = rgba(hex);
+  const out = src.clone();
+  for (let y = 0; y < src.h; y++)
+    for (let x = 0; x < src.w; x++) {
+      if (src.get(x, y) !== k) continue;
+      const up = src.get(x, y - 1), lf = src.get(x - 1, y), rt = src.get(x + 1, y), dn = src.get(x, y + 1);
+      if (!(up >>> 24) || !(lf >>> 24) || !(rt >>> 24) || !(dn >>> 24)) continue;
+      if (up !== k && lf !== k) continue;
+      const fill = [dn, rt, lf, up].find((p) => p !== k);
+      if (fill !== undefined) out.set(x, y, fill);
+    }
+  return out;
+}
+
+// Rim light (top-left light source): fill pixels whose upper or left
+// neighbour is outline/transparent step one shade lighter in their ramp.
+// Adds edge definition to upscaled parts.
+import { CLONE_ARMOR, GUNMETAL, CANVAS, SANDBAG, DROID_STEEL, DROID_TAN, KAMINO, STRIPES, PAINT_RED, PAINT_GOLD } from './palettes.js';
+const LIGHTER = (() => {
+  const m = new Map();
+  const ramps = [CLONE_ARMOR, GUNMETAL, CANVAS, SANDBAG, DROID_STEEL, DROID_TAN, KAMINO.slice(0, 8), PAINT_RED, PAINT_GOLD, ...Object.values(STRIPES)];
+  for (const r of ramps) for (let i = 1; i < r.length; i++) if (!m.has(rgba(r[i]))) m.set(rgba(r[i]), rgba(r[i - 1]));
+  return m;
+})();
+export function rimLight(src, outlineHex = '#101217') {
+  const k = rgba(outlineHex);
+  const out = src.clone();
+  for (let y = 0; y < src.h; y++)
+    for (let x = 0; x < src.w; x++) {
+      const p = src.get(x, y);
+      if (!(p >>> 24) || p === k) continue;
+      const up = src.get(x, y - 1), lf = src.get(x - 1, y);
+      const edge = !(up >>> 24) || up === k || !(lf >>> 24) || lf === k;
+      if (!edge) continue;
+      const l = LIGHTER.get(p);
+      if (l !== undefined) out.set(x, y, l);
+    }
+  return out;
+}

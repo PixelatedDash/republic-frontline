@@ -6,7 +6,7 @@
 import kamino1 from './kamino-1.js';
 
 export const LEVELS = { 'kamino-1': kamino1 };
-export const TILE = 16;
+export const TILE = 32;
 
 export const PROP_SIZE = { dome: 2, mast: 1, floodlight: 1, crates: 1, generator: 1 };
 
