@@ -5,7 +5,10 @@
   "type": "module",
   "description": "Pixel-art tower defense PWA. The game itself has no build step; devDependencies are for tools/ only.",
   "scripts": {
-    "art": "node tools/export-art.mjs"
+    "art": "node tools/export-art.mjs",
+    "lint:art": "node tools/art/lint-art.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "sim": "node tools/sim/run.mjs"
   },
   "devDependencies": {
     "@napi-rs/canvas": "1.0.9",
