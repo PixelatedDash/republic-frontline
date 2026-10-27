@@ -22,6 +22,12 @@ export const STRIPES = {
   flak: ['#b07a6a', '#875548', '#5f3a31'],       // brick
   elite: ['#d0b060', '#9c7f3c', '#6a5527'],      // dull gold
   marksman: ['#8a9a8a', '#617061', '#434e43'],   // sage
+  repeater: ['#6fa39c', '#4b7a74', '#33544f'],   // teal
+  artillery: ['#a8875e', '#7c6243', '#55432e'],  // umber
+  ion: ['#8088c0', '#5a6196', '#3d426a'],        // indigo
+  sharpshooter: ['#a07e9c', '#755b72', '#4f3d4d'], // plum
+  depot: ['#b8a35e', '#8a7944', '#5d512e'],      // mustard
+  breaker: ['#b08a7a', '#85645a', '#5c443d'],    // dusty rose
 };
 
 // ---- Energy (the only fully saturated colors) -----------------------------
@@ -75,6 +81,7 @@ export const LEGEND = {
   C: REPUBLIC_BOLT[1], c: REPUBLIC_BOLT[2], x: REPUBLIC_BOLT[3],
   F: FIRE[2], f: FIRE[3],
   V: SHIELD[1], U: SHIELD[2], X: SHIELD[3],
+  i: ION[2], I: ION[3], J: ION[4],
   '#': '#ffffff',
 };
 

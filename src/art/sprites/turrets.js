@@ -9,7 +9,7 @@ import { Bitmap, blit, fromMap, outline } from '../bitmap.js';
 
 // ---------------------------------------------------------------- bases ----
 // White Republic armor pedestal: lit top, banded front face with unit stripe.
-const MOUNT = [
+export const MOUNT = [
   '....kkkkkkkk....',
   '..kkWWWWWWwwkk..',
   '.kWWWwwwwwwwwvk.',
@@ -26,14 +26,14 @@ const MOUNT = [
   'kvvvvvvvvvvuuuuk',
   '.kkkkkkkkkkkkkk.',
 ];
-const PLINTH_BAGS = [
+export const PLINTH_BAGS = [
   '.kkkkkk.kkkkkk.kkkk.',
   'kyyyyyYkyyyyyYkyyyYk',
   'kYYYYYokYYYYYokYYYok',
   'kooooOOkooooOOkoooOk',
   '.kkkkkk.kkkkkk.kkkk.',
 ];
-const PLINTH_PLATE = [
+export const PLINTH_PLATE = [
   'kkkkkkkkkkkkkkkkkkkk',
   'kmmmmmmmmmmmmmmmmmMk',
   'kMmMMMMMMMMMMMMMMmnk',
@@ -41,7 +41,7 @@ const PLINTH_PLATE = [
   'knnnnnnnnnnnnnnnnnNk',
   'kkkkkkkkkkkkkkkkkkkk',
 ];
-const BLAST_SHIELD = [
+export const BLAST_SHIELD = [
   '.kkkkkkkkkkkkkkkkkk.',
   'kWWWWWWWWWWWWWWWWWvk',
   'kWwwwwwwwwwwwwwwwvuk',
@@ -50,7 +50,7 @@ const BLAST_SHIELD = [
   'kvvvvvvvvvvvvvvvvuuk',
   'kkkkkkkkkkkkkkkkkkkk',
 ];
-const AMMO_BOX = [
+export const AMMO_BOX = [
   'kkkkkkk',
   'kllllLk',
   'kLdDLjk',
@@ -58,7 +58,7 @@ const AMMO_BOX = [
   'kjjjjjk',
   'kkkkkkk',
 ];
-const RADAR_MAST = [
+export const RADAR_MAST = [
   'kkkkkkk',
   'kmmmMnk',
   '.kMcNk.',
@@ -72,7 +72,7 @@ const RADAR_MAST = [
   '.knNNk.',
   '.kkkkk.',
 ];
-const RADAR_DISH = [
+export const RADAR_DISH = [
   'kk....kk',
   'kWk..kvk',
   'kwWkkwuk',
@@ -87,7 +87,7 @@ const RADAR_DISH = [
   '..knNk..',
   '..kkkk..',
 ];
-const MISSILE_CRATE = [
+export const MISSILE_CRATE = [
   'kkkkkkkkkkkkkk',
   'kllllllllllllk',
   'kLkkkkkkkkkkLk',
@@ -138,7 +138,7 @@ const barrel = (len, brake = false) => {
 };
 // Rocket tubes: olive, 3 rows thick, dark bore at the muzzle.
 const tube = (len) => ['l'.repeat(len - 1) + 'k', 'L'.repeat(len - 1) + 'B', 'j'.repeat(len - 1) + 'k'];
-const TUBE_CLAMP = ['mM', 'MN', 'nN'];
+export const TUBE_CLAMP = ['mM', 'MN', 'nN'];
 const ROCKET_BOX_4 = [
   'llllllllllk',
   'lLLLLLLLLkB',
@@ -160,12 +160,12 @@ const ROCKET_BOX_9 = [
   'lLLLLLLLLLkB',
   'jjjjjjjjjjjk',
 ];
-const OPTIC = ['kk', 'cT', 'kk'];
+export const OPTIC = ['kk', 'cT', 'kk'];
 const HEAVY_TUBE = ['l'.repeat(13) + 'k', 'l'.repeat(13) + 'B', 'L'.repeat(13) + 'B', 'j'.repeat(13) + 'k'];
 const WARHEAD = ['.dd', 'ddD', 'dDD', '.DD'];
 const MISSILE = ['WWWwvpP', 'wwwvvPq'];
 
-function assemble(w, h, parts) {
+export function assemble(w, h, parts) {
   const bm = new Bitmap(w, h);
   for (const [map, x, y] of parts) blit(bm, fromMap(map), x, y);
   return outline(bm);

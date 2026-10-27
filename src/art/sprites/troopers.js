@@ -212,6 +212,14 @@ export function stripeSwap(bm, name) {
 
 // Returns { bm, mx, my } with the muzzle position in frame coordinates.
 // recoil: px the gun kicks back; bob: px the body dips (idle breathing).
+// Rail rifle (Rail Marksman): the long rifle with glowing accelerator coils
+// set into the barrel every third pixel.
+WEAPONS.railrifle = Object.fromEntries(Object.entries(WEAPONS.longrifle).map(([d, w]) => {
+  let n = 0;
+  const map = w.map.map((row) => row.replace(/n/g, () => (n++ % 3 === 1 ? 'i' : 'n')));
+  return [d, { ...w, map }];
+}));
+
 export function buildTrooper(dir, weapon = 'carbine', stripe = 'rifle', recoil = 0, bob = 0) {
   const src = MIRROR[dir] || dir;
   const flip = !!MIRROR[dir];
