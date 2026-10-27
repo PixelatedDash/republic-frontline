@@ -29,7 +29,7 @@ const rollTread = (tread, f) => tread.map((r, i) => (i < 2 ? r[0] + rot(r.slice(
 // Darkened, scorched copy used for burning / wreck frames.
 const SCORCH = (() => {
   const m = {};
-  const pairs = [['a', 'e'], ['A', 'E'], ['e', 'E'], ['E', 'H'], ['g', 'h'], ['G', 'H'], ['h', 'H'], ['W', 'v'], ['w', 'u'], ['R', 'q'], ['Q', 'q'], ['p', 'P'], ['V', 'X'], ['U', 'X']];
+  const pairs = [['a', 'e'], ['A', 'E'], ['e', 'E'], ['E', 'H'], ['g', 'h'], ['G', 'H'], ['h', 'H'], ['W', 'v'], ['w', 'u'], ['R', 'q'], ['Q', 'q'], ['p', 'P'], ['V', 'X'], ['U', 'X'], ['m', 'n'], ['M', 'N'], ['n', 'N']];
   for (const [f, t] of pairs) m[LEGEND[f]] = LEGEND[t];
   return m;
 })();

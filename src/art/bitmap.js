@@ -277,3 +277,16 @@ export function rimLight(src, outlineHex = '#101217') {
     }
   return out;
 }
+
+// Night outline (Umbara): outline pixels that border transparency become a
+// cool moonlit tone so dark units keep their silhouette on near-black ground.
+export function nightRim(src, outlineHex = '#101217', rimHex = '#5d5878') {
+  const k = rgba(outlineHex), r = rgba(rimHex);
+  const out = src.clone();
+  for (let y = 0; y < src.h; y++)
+    for (let x = 0; x < src.w; x++) {
+      if (src.get(x, y) !== k) continue;
+      if (!(src.get(x - 1, y) >>> 24) || !(src.get(x, y - 1) >>> 24) || !(src.get(x + 1, y) >>> 24)) out.set(x, y, r);
+    }
+  return out;
+}

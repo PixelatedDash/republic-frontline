@@ -1,7 +1,7 @@
 # Republic Frontline — project conventions
 
 Pixel-art tower defense PWA (vanilla JS ES modules + Canvas 2D, no game build step).
-The full spec is the build prompt (`republic-tower-defense-prompt-v2.md`, kept by Andrew).
+The full spec is the build prompt; a verbatim copy lives in `docs/spec-v2.md` (git-ignored: the repo is public).
 Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 
 ## Process
@@ -49,7 +49,8 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 ## Commands
 - `npm install` — dev tools only (`@napi-rs/canvas`, `pptxgenjs`)
 - `node tools/export-art.mjs` — render every sprite strip + slides to `art-preview/`, build `art-preview.pptx`
-- `node tools/art/lint-art.mjs` — orphan-pixel check on every composed tower/enemy frame
+- `node tools/export-art-2.mjs` — Phase 2 art checkpoint deck (`art-preview-2/`, `art-preview-2.pptx`)
+- `node tools/art/lint-art.mjs` — orphan-pixel check on every composed tower/enemy/boss/prop frame (Phase 1 + 2)
 - `node tools/serve.mjs [port] [--lan]` — no-cache dev server (`--lan` to test on a phone over Wi-Fi; no service worker over http)
 - `npm test` — unit tests; `node tools/sim/run.mjs --level kamino-1 --difficulty jedi --bot balanced --seeds 5` — headless bots
 - `?skip=1` on the URL jumps straight into Kamino 1 (dev shortcut)

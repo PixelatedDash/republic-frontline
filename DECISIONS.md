@@ -46,3 +46,21 @@ Judgment calls where the spec was silent or ambiguous. One line each, with the r
 - **Camera:** 120 ms eased zoom between integer scales (spec allows it), pan momentum after a swipe; integer scale at rest.
 - **Damage numbers draw in the UI layer** so they stay legible at any world zoom.
 - **Deck export at 2x:** sprite strips at 2x (same physical size as 4x of the old art); mockup / readability / HUD slides are frames from the real GameScreen running headless (tools/art/headless.mjs); the iPhone frames are shown at exactly half size (lossless because all scales on that screen are even).
+
+## Phase 2 (art checkpoint)
+- **Spec copy:** the original build prompt was no longer in Downloads; it was recovered verbatim from the session transcript into `docs/spec-v2.md` (git-ignored, because the repo is public).
+- **Footprints:** Repeater, Artillery, Ion and Sharpshooter are 1x1 like Rocket/Flak; Supply Depot is 2x2 (spec).
+- **New unit stripes:** Repeater teal, Artillery umber, Ion indigo, Sharpshooter plum, Depot mustard, Armor Breaker dusty rose. Artillery T1/T2 cradles are painted in the stripe color so field guns read differently from the Repeater at a glance.
+- **Repeater spin-up:** the rotary bundle has 2 spin frames (grooves alternate rows); the game cycles them faster as it spins up.
+- **Ion tier 4 does not aim:** Ion Arc (chain mast) and Pulse Dome are static emitters whose ion pixels pulse (4-frame palette step on the ion ramp only); arcs / pulses originate at an `emit` point.
+- **Sharpshooter Post:** a watchtower with one 2x marksman between back/front layers (same system as the Rifle nest); Rail Marksman uses a rail rifle (long rifle with ion accelerator coils). Armor Breaker adds a spotter scope and a pennant.
+- **Commando / Tactical legs** reuse the Trooper Droid leg poses palette-swapped to steel (Tactical's are stretched by repeating two shin rows); their upper bodies are new. Tactical has a maroon command torso so it never reads as a Commando.
+- **Shield Walker** is a quadruped built from two droid leg pairs, the front pair half a cycle ahead.
+- **Vehicles** (Heavy Tank, Carrier, Foundry, Reaper) animate running gear: tread rows roll 1px per frame, Carrier wheels have 2 spoke frames.
+- **Bosses are hand-placed at 1x and upscaled** (Scale2x + outline thinning + rim light), like turret parts: at 48-96 px (1x) they keep their detail, and hand-placing 100-190 px maps at 2x was not a good use of the budget. Phase changes are overlays; weak points (Foundry vents) are separate sprites with positions.
+- **Boss deaths** are flash -> burning (scorch palette swap + hand-placed flame tufts) -> wreck; the big explosion is the runtime VFX.
+- **Tidebreaker entrance** is 8 reveal frames with foam at the waterline (frame assembly from the walk frame).
+- **Planet hazards:** Geonosis canyon chasm, Kashyyyk misty ravine, Umbara swamp, Mustafar lava; all 8 frames like the Kamino sea. One shared autotiler (`renderLand`) handles ground / rough / path / hazard / bridge for the four land planets.
+- **Night outline (Umbara):** dark steel droids vanished on near-black ground, so on Umbara unit outlines that border transparency take a cool moonlit tone (`nightRim`). Spec says visibility is visual only; this keeps every silhouette readable.
+- **Stray pixels from upscaling:** `hd()` now ends with the same orphan-pixel cleanup RotSprite uses (Phase 1 art had none, so it is unchanged); lint now covers 982 frames including all Phase 2 art.
+- **Boot cost:** Phase 2 art builds in ~0.5 s (Node and desktop Chrome) on top of Phase 1's 0.2 s. When wiring in, build each planet's tiles and boss only when that planet is entered.

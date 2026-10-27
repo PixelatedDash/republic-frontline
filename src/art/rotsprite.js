@@ -88,5 +88,5 @@ export function rotations(src, dirs = 16, px, py, size, n = 8) {
 import { thinOutline, rimLight } from './bitmap.js';
 export function hd(src, rim = true) {
   const b = thinOutline(scale2x(src));
-  return rim ? rimLight(b) : b;
+  return cleanOrphans(rim ? rimLight(b) : b);
 }

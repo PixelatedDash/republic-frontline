@@ -57,3 +57,22 @@
 - Balanced bot wins Kamino 1 on Padawan/Jedi but loses on Jedi Master; it is a floor, not a skill benchmark.
 - Turret parts, props and icons are upscaled 1x art with rim light (smooth, but less hand detail than troopers/droids/tiles).
 - Not yet measured: real-device frame rate (benchmark tooling is Phase 5).
+
+## 2026-10-27 — Phase 2 art checkpoint — STOPPED for review
+
+**Done**
+- 5 new towers, all tiers + both tier-4 branches: Repeater Nest, Artillery Battery, Ion Cannon, Sharpshooter Post, Supply Depot (`src/art/sprites/turrets2.js`, `posts.js`, builders in `towers.js`).
+- 9 new droids with move + death frames: Commando, Tactical, Heavy Tank, Droid Carrier, Shield Walker, Crawler Walker, Siege Walker, Bomber Gunship (air), Repair Drone (air) (`sprites/droids2.js`, `enemies.js`).
+- 5 bosses with every phase and weak point (`sprites/bosses.js`, `bosses.js`).
+- Geonosis / Kashyyyk / Umbara / Mustafar tilesets + props + shared autotiler `renderLand` (`sprites/planets.js`, `tilemap.js`).
+- `buildArtPhase2()` in `src/art/index.js` (not loaded by the game yet).
+- `node tools/export-art-2.mjs` -> `art-preview-2/` + `art-preview-2.pptx` (23 slides incl. one mockup per planet and a silhouette check). Lint extended to 982 frames.
+- Spec recovered to `docs/spec-v2.md` (git-ignored).
+
+**Next (after approval):** wire Phase 2 content into the game: all 8 towers, 14 enemies, damage/shield/stacking for the new units, economy caps, biomes + weather, 20 maps, 5 bosses, spam / no-upgrade bots, BALANCE.md + BALANCE_REPORT.md.
+
+**Known issues / weaker spots**
+- Commando and Trooper Droid silhouettes are the closest pair (both humanoid with a forward gun; the Trooper has the backpack, the Commando is slimmer and steel).
+- Repair Drone and Droid Carrier are on the small side next to towers; fine at default zoom, revisit if they get lost in swarms.
+- Kashyyyk ravine and Geonosis chasm are mostly static (8 frames of slow drift); weather particles will carry most of the motion.
+- Docs commit with the live URL and these commits still need a push from GitHub Desktop.

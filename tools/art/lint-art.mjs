@@ -1,6 +1,6 @@
 // Art lint: fails if any composed tower/enemy frame has an orphan pixel
 // (an opaque pixel with no opaque 4-neighbor).   node tools/art/lint-art.mjs
-import { buildArt, TIERS } from '../../src/art/index.js';
+import { buildArt, buildArtPhase2, TIERS } from '../../src/art/index.js';
 import { composeRifle, composeTurret, DIRS8 } from '../../src/art/towers.js';
 
 const art = buildArt();
@@ -22,6 +22,26 @@ for (const [k, e] of Object.entries(art.enemies)) {
   if (k === 'fighter') e.frames.flat().forEach((f, i) => frames.push([`fighter ${i}`, f]));
   else [...e.walk, ...e.death.slice(1)].forEach((f, i) => frames.push([`${k} ${i}`, f]));
 }
+// Phase 2 content
+const a2 = buildArtPhase2();
+for (const t of TIERS) {
+  for (const k of ['repeater', 'artillery', 'ion']) {
+    const tw = a2.towers[k][t];
+    if (tw.static) tw.pulse.forEach((f, i) => frames.push([`${k} ${t} pulse${i}`, f]));
+    else for (let d = 0; d < 32; d += 2) frames.push([`${k} ${t} dir${d}`, composeTurret(tw, d, { spin: d & 1 })]);
+  }
+  for (const d of DIRS8) frames.push([`sharpshooter ${t} ${d}`, composeRifle(a2.towers.sharpshooter[t], d)]);
+  a2.towers.depot[t].frames.forEach((f, i) => frames.push([`depot ${t} ${i}`, f]));
+}
+for (const [k, e] of Object.entries(a2.enemies)) {
+  if (e.frames) e.frames.flat().forEach((f, i) => frames.push([`${k} ${i}`, f]));
+  else [...e.walk, ...e.death.slice(1)].forEach((f, i) => frames.push([`${k} ${i}`, f]));
+}
+const B = a2.bosses;
+const bossFrames = { tidebreaker: [...B.tidebreaker.walk, ...B.tidebreaker.deploy], foundry: [...B.foundry.walk, B.foundry.compose(0, { doorState: 2, broken: [0, 1, 2] })], reaper: [...B.reaper.walk, ...B.reaper.armored], dreadnought: B.dreadnought.frames.flat(), warlord: B.warlord.phases.flat() };
+for (const [k, list] of Object.entries(bossFrames)) list.forEach((f, i) => frames.push([`boss ${k} ${i}`, f]));
+for (const [p, t] of Object.entries(a2.tiles)) Object.entries(t.props).forEach(([n, f]) => frames.push([`prop ${p} ${n}`, f]));
+
 const bad = frames.map(([n, f]) => [n, orphans(f)]).filter(([, c]) => c > 0);
 console.log(`lint-art: ${frames.length} frames, ${bad.length} with orphan pixels`);
 for (const [n, c] of bad) console.log(`  ${n}: ${c}`);
