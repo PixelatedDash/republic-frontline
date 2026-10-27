@@ -20,6 +20,7 @@ import { TILE } from '../data/levels/index.js';
 
 const BUILD_KEYS = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i'];
 const SLOT_TYPES = ['rifle', 'rocket', 'flak', 'repeater', 'artillery', 'ion', 'sharpshooter', 'depot'];
+const EDGE = { kamino: '#1f2c33', geonosis: '#43291d', kashyyyk: '#2a2016', umbara: '#0c0b15', mustafar: '#131011' };
 const MODE_LABEL = { first: 'FIRST', last: 'LAST', strongest: 'STRONGEST', closest: 'CLOSEST', air: 'AIR PRIORITY' };
 
 export class GameScreen {
@@ -27,9 +28,18 @@ export class GameScreen {
     this.app = app;
     this.sim = snap ? restore(snap) : createSim({ levelId, difficulty, seed: seed ?? ((Date.now() & 0xffff) + 1) });
     this.level = this.sim.level;
-    this.ground = buildGroundLayers(this.level, app.art.tiles.kamino, app.createCanvas);
+    // per-planet art: ground tiles, props, boss; Umbara droids get night outlines
+    const planet = (this.planet = this.level.def.planet);
+    const pa = app.ensurePlanet(planet);
+    const land = planet !== 'kamino';
+    this.P = pa.P;
+    this.ground = buildGroundLayers(this.level, land ? pa.tiles : app.art.tiles.kamino, app.createCanvas, land);
     this.cam = new Camera(this.level.w * TILE, this.level.h * TILE);
     this.fx = new Fx(app.assets, app.audio);
+    this.fx.planet = planet;
+    this.fx.P = this.P;
+    this.E = this.fx.E = planet === 'umbara' ? app.nightEnemies() : app.assets.enemies;
+    this.cine = null; // boss entrance cinematic
     this.speed = 1;
     this.paused = false;
     this.acc = 0;
@@ -53,7 +63,7 @@ export class GameScreen {
     // start view: centre on the path entry for the first wave
     const p0 = this.level.paths[0].pts[1];
     this.cam.centerOn(p0[0] - 120, p0[1] + 80);
-    app.audio.playMusic('kamino');
+    app.audio.playMusic(this.s.enemies.some((e) => e.boss) ? 'boss' : planet);
   }
 
   resize() {
@@ -220,13 +230,23 @@ export class GameScreen {
   // ------------------------------------------------------------- update --
   update(dt, events) {
     this.time += dt;
+    // boss entrance: ~3 s letterboxed pan to the boss, sim paused, tap to skip
+    if (this.cine) {
+      const c = this.cine;
+      c.t += dt;
+      const k = Math.min(1, c.t / 1.1), ease = 1 - (1 - k) ** 3;
+      this.cam.centerOn(c.fx + (c.x - c.fx) * ease, c.fy + (c.y - c.fy) * ease);
+      this.fx.bossRise.set(c.id, c.t);
+      if (c.t > 3.2 || events.some((e) => e.type === 'down' || e.type === 'key')) this.cine = null;
+      events = [];
+    }
     this.handleInput(events);
     this.cam.update(dt);
     const portrait = this.app.portraitBlocked();
     const tut = this.tutorial?.update();
     // mid-wave tutorial messages pause the action until handled
     this.tutPaused = !!(tut && tut.when && this.s.phase === 'running' && !tut.id.startsWith('upgrade') && !tut.id.startsWith('target'));
-    const running = !this.paused && !this.menu && !portrait && !this.tutPaused && (this.s.phase === 'running');
+    const running = !this.paused && !this.menu && !portrait && !this.tutPaused && !this.cine && (this.s.phase === 'running');
     if (running) {
       this.acc += dt * this.speed;
       const maxSteps = 4 * this.speed;
@@ -293,6 +313,19 @@ export class GameScreen {
       if (u.t === 'banner') this.banner = { text: u.text, sub: u.sub, t: 0 };
       if (u.t === 'leak') this.livesFlash = 0.6;
       if (u.t === 'income') this.floaters.push({ text: u.text, t: 0 });
+      if (u.t === 'boss') {
+        const c0 = this.cam.toWorld(this.app.sc.dw / 2, this.app.sc.dh / 2);
+        this.cine = { t: 0, id: u.id, type: u.type, x: u.x, y: u.y - 40, fx: c0.x, fy: c0.y };
+        this.app.audio.sfx('siren');
+        this.app.audio.playMusic('boss');
+        this.fx.addShake(3);
+      }
+      if (u.t === 'bossPhase') this.banner = { text: `PHASE ${u.phase}`, sub: ENEMIES[u.type].name.toUpperCase(), t: 0 };
+      if (u.t === 'bossDown') {
+        this.banner = { text: 'BOSS DESTROYED', sub: ENEMIES[u.type].name.toUpperCase(), t: 0 };
+        this.app.audio.playMusic(this.planet);
+      }
+      if (u.t === 'lightsOut') this.floaters.push({ text: 'LIGHTS OUT: RANGE -20%', t: 0 });
     }
     this.fx.uiEvents.length = 0;
   }
@@ -305,12 +338,21 @@ export class GameScreen {
   // ------------------------------------------------------------- render --
   render() {
     const app = this.app, r = app.renderer, ui = app.ui;
-    r.begin('#1f2c33'); // sea colour beyond the map edge
+    r.begin(EDGE[this.planet] || '#1f2c33'); // colour beyond the map edge
     const sel = this.selected();
     drawWorld({
-      r, A: app.assets, sim: this.sim, fx: this.fx, cam: this.cam, ground: this.ground, alpha: this.alpha ?? 1,
+      r, A: app.assets, P: this.P, E: this.E, sim: this.sim, fx: this.fx, cam: this.cam, ground: this.ground, alpha: this.alpha ?? 1,
       sel, placing: this.placing, settings: app.save.settings, waterFrame: Math.floor(this.time * 6), time: this.time,
     });
+    // Umbara: perpetual night; towers cast pools of light, energy glows on top
+    if (this.planet === 'umbara') {
+      r.ui();
+      r.rect(0, 0, ui.vw, ui.vh, '#05040c', 0.42);
+      r.world(this.cam);
+      this.fx.drawLights(r, this.sim);
+      this.fx.drawGlows(r, this.sim, this.alpha ?? 1);
+      this.fx.drawBeams(r);
+    }
     if (this.placing) {
       const p = this.placing;
       const t = { type: p.type, tier: 't1', tx: p.tx, ty: p.ty, aim: Math.PI / 2, id: -1 };
@@ -319,30 +361,53 @@ export class GameScreen {
     // weather (screen space, world-independent)
     r.ui();
     this.fx.drawTexts(r, (x, y) => { const sp = this.cam.toScreen(x, y); return ui.toUI(sp.x, sp.y); });
-    this.drawRain(r);
-    if (this.fx.lightning > 0) r.rect(0, 0, ui.vw, ui.vh, '#dff4ff', this.fx.lightning * 0.5);
+    this.fx.drawWeather(r, ui, this.time);
     ui.beginFrame();
-    if (!this.hideHud) this.drawHud();
+    if (this.cine) this.drawCinematic();
+    else if (!this.hideHud) this.drawHud();
     ui.endFrame();
   }
 
-  drawRain(r) {
-    const { vw, vh } = this.app.ui;
-    const t = this.time;
-    const n = Math.round(this.fx.rain.length * (this.fx.reduce ? 0.4 : [1, 0.8, 0.55, 0.35][this.fx.quality]));
-    const drop = this.app.assets.vfx.rain;
-    for (let i = 0; i < n; i++) {
-      const d = this.fx.rain[i];
-      const y = ((d.y * (vh + 20) + t * 220 * d.s) % (vh + 20)) - 10;
-      const x = ((d.x * (vw + 40) - t * 60 * d.s) % (vw + 40) + vw + 40) % (vw + 40) - 20;
-      r.hi(drop, x, y, 0.8);
+  // Letterboxed boss entrance: bars slide in, name card, siren.
+  drawCinematic() {
+    const r = this.app.renderer, ui = this.app.ui, c = this.cine;
+    const k = Math.min(1, c.t / 0.35), out = c.t > 2.8 ? Math.min(1, (c.t - 2.8) / 0.4) : 0;
+    const bar = Math.round(ui.vh * 0.14 * k * (1 - out));
+    r.rect(0, 0, ui.vw, bar, '#05080b');
+    r.rect(0, ui.vh - bar, ui.vw, bar, '#05080b');
+    ui.block('cine', 0, 0, ui.vw, ui.vh);
+    if (c.t > 0.5 && out < 1) {
+      const d = ENEMIES[c.type];
+      const a = Math.min(1, (c.t - 0.5) / 0.3);
+      r.rect(0, ui.vh * 0.62 - 4, ui.vw, 34, '#05080b', 0.6 * a * (1 - out));
+      if (Math.floor(c.t * 4) % 2 || c.t > 1.2) r.textBig('WARNING', ui.vw / 2, ui.vh * 0.62 - 2, COLORS.bad, 1);
+      r.textBig(d.name.toUpperCase(), ui.vw / 2, ui.vh * 0.62 + 10, COLORS.text, 2);
+      r.text(d.lore.toUpperCase(), ui.vw / 2, ui.vh - bar + 4 - 14, COLORS.dim, { align: 'center' });
     }
+    r.text('TAP TO SKIP', ui.vw - 8, bar ? bar - 10 : 4, COLORS.faint, { align: 'right' });
+  }
+
+  // Big boss HP bar with name, shield bar and phase pips.
+  drawBossBar(top) {
+    const r = this.app.renderer, ui = this.app.ui;
+    const b = this.s.enemies.find((e) => e.boss);
+    if (!b) return;
+    const d = ENEMIES[b.type];
+    const w = Math.min(200, Math.floor(ui.vw * 0.36)), x = Math.round((ui.vw - w) / 2), y = top + ui.T + 14;
+    r.panel(x - 4, y - 3, w + 8, 22);
+    r.text(d.name.toUpperCase(), x, y, COLORS.bad);
+    const n = (d.phases?.length || 0) + 1;
+    for (let i = 0; i < n; i++) r.rect(x + w - 6 - i * 7, y + 1, 5, 5, i < n - (b.phase || 0) ? COLORS.bad : '#33404a');
+    r.rect(x, y + 9, w, 5, '#101217');
+    r.rect(x, y + 9, Math.max(1, Math.round(w * b.hp / b.maxHp)), 5, '#ff5a3c');
+    if (b.maxShield > 0) r.rect(x, y + 15, Math.round(w * b.shield / b.maxShield), 2, '#e2a6ff');
   }
 
   drawHud() {
     const app = this.app, r = app.renderer, ui = app.ui, A = app.assets, s = this.s;
     const T = ui.T, ins = ui.ins, vw = ui.vw, vh = ui.vh;
     const L = 4 + ins.left, R = vw - 4 - ins.right, top = 4 + ins.top, bot = vh - 4 - ins.bottom;
+    this.drawBossBar(top);
 
     // --- resources
     const rw = 156;
@@ -363,7 +428,7 @@ export class GameScreen {
     if (pv && s.phase !== 'won' && s.phase !== 'lost') {
       const pw = rw;
       let tallest = 0;
-      for (const g of pv.groups) { const set = A.enemies[g.type]; tallest = Math.max(tallest, (set.walk ? set.h : set.size * 0.8) * app.sc.HIR); }
+      for (const g of pv.groups) { const set = A.enemies[g.type]; if (set) tallest = Math.max(tallest, (set.walk ? set.h : set.size * 0.8) * app.sc.HIR); }
       const ph = Math.max(30, Math.round(14 + tallest + 2));
       r.panel(L, py, pw, ph, { title: true });
       ui.block('hud:prev', L, py, pw, ph);
@@ -371,6 +436,11 @@ export class GameScreen {
       r.text(label, L + 6, py + 4, COLORS.accent);
       let x = L + 6;
       for (const g of pv.groups) {
+        if (ENEMIES[g.type].boss) {
+          r.text('BOSS', x, py + ph - 11, Math.floor(this.time * 3) % 2 ? COLORS.bad : COLORS.warn);
+          x += 28;
+          continue;
+        }
         const set = A.enemies[g.type];
         const ref = set.walk ? set.walk[1] : set.frames[0][0];
         const k = app.sc.HIR;
@@ -526,20 +596,31 @@ export class GameScreen {
     for (let i = 0; i < 4; i++) r.rect(x + w - 34 + i * 7, y + 6, 5, 5, i < tierN ? COLORS.accent : '#33404a');
     let cy = y + 16;
     const row = (k, v, c = COLORS.text) => { r.text(k, x + 6, cy, COLORS.dim); r.text(v, x + 64, cy, c); cy += rowH; };
-    row('DPS', towerDps(t.type, t.tier).toFixed(1));
-    row('DAMAGE', def.dtype.toUpperCase());
-    row('HITS AIR', st.air ? 'YES' : 'NO', st.air ? COLORS.good : COLORS.bad);
-    r.text(`KILLS ${t.kills}`, x + w - 6, y + 16, COLORS.faint, { align: 'right' });
-    // targeting
-    cy += 2;
-    const modes = TARGET_MODES.filter((m) => m !== 'air' || st.air);
-    const mi = Math.max(0, modes.indexOf(t.mode));
-    const hl = this.tutorial?.current()?.highlight === 'targeting' && Math.floor(this.time * 3) % 2;
-    if (ui.button('info:prev', x + 6, cy, T, T, { label: '<' })) { setTargeting(this.sim, t.id, modes[(mi + modes.length - 1) % modes.length]); this.tutorial?.signal('targeting'); }
-    r.panel(x + 6 + T + 2, cy, w - 12 - 2 * (T + 2), T);
-    r.text(MODE_LABEL[t.mode], x + w / 2, cy + ((T - 7) >> 1), hl ? COLORS.good : COLORS.text, { align: 'center' });
-    if (ui.button('info:next', x + w - 6 - T, cy, T, T, { label: '>' })) { setTargeting(this.sim, t.id, modes[(mi + 1) % modes.length]); this.tutorial?.signal('targeting'); }
-    cy += T + 6;
+    if (!st.rate) {
+      // Supply Depot: income or the relay aura instead of weapon stats
+      row('INCOME', st.income ? `+${st.income} / WAVE` : 'NONE', st.income ? COLORS.good : COLORS.dim);
+      row('AURA', st.aura ? `+${Math.round(st.aura.rate * 100)}% FIRE RATE` : 'NONE', st.aura ? COLORS.good : COLORS.dim);
+      row('DEPOTS', `${s.towers.filter((o) => o.type === 'depot').length} / 3`);
+      cy += 2 + T + 6;
+    } else {
+      row('DPS', towerDps(t.type, t.tier).toFixed(1));
+      row('DAMAGE', def.dtype.toUpperCase());
+      row('HITS AIR', st.air ? 'YES' : 'NO', st.air ? COLORS.good : COLORS.bad);
+      r.text(`KILLS ${t.kills}`, x + w - 6, y + 16, COLORS.faint, { align: 'right' });
+      // targeting (pulse domes hit everything in range: no mode)
+      cy += 2;
+      if (st.pulse) r.text('HITS ALL IN RANGE', x + w / 2, cy + ((T - 7) >> 1), COLORS.dim, { align: 'center' });
+      else {
+        const modes = TARGET_MODES.filter((m) => m !== 'air' || st.air);
+        const mi = Math.max(0, modes.indexOf(t.mode));
+        const hl = this.tutorial?.current()?.highlight === 'targeting' && Math.floor(this.time * 3) % 2;
+        if (ui.button('info:prev', x + 6, cy, T, T, { label: '<' })) { setTargeting(this.sim, t.id, modes[(mi + modes.length - 1) % modes.length]); this.tutorial?.signal('targeting'); }
+        r.panel(x + 6 + T + 2, cy, w - 12 - 2 * (T + 2), T);
+        r.text(MODE_LABEL[t.mode], x + w / 2, cy + ((T - 7) >> 1), hl ? COLORS.good : COLORS.text, { align: 'center' });
+        if (ui.button('info:next', x + w - 6 - T, cy, T, T, { label: '>' })) { setTargeting(this.sim, t.id, modes[(mi + 1) % modes.length]); this.tutorial?.signal('targeting'); }
+      }
+      cy += T + 6;
+    }
     const sv = sellValue(t, s.wavesEnded);
     const sellLabel = this.sellConfirm > 0 ? `CONFIRM ${sv}` : `SELL ${sv}`;
     const sell = (bx, bw, by) => {
@@ -568,8 +649,7 @@ export class GameScreen {
       r.text(`NEXT: ${ns.name.toUpperCase()}`, x + 6, cy, COLORS.dim);
       cy += rowH + 1;
       const rows = [
-        ['DPS', towerDps(t.type, t.tier), towerDps(t.type, nexts[0]), (v) => v.toFixed(1)],
-        ['RANGE', st.range, ns.range, String],
+        ...(st.rate ? [['DPS', towerDps(t.type, t.tier), towerDps(t.type, nexts[0]), (v) => v.toFixed(1)], ['RANGE', st.range, ns.range, String]] : [['INCOME', st.income || 0, ns.income || 0, String]]),
         ['SPLASH', st.splash || 0, ns.splash || 0, String],
         ['AIR', st.air ? 1 : 0, ns.air ? 1 : 0, (v) => (v ? 'YES' : 'NO')],
       ].filter((d, i) => i < 2 || d[1] !== d[2]).slice(0, diffRows);

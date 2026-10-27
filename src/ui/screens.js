@@ -3,7 +3,7 @@
 
 import { COLORS } from './ui.js';
 import { drawSettings } from './settings.js';
-import { LEVELS, buildLevel } from '../data/levels/index.js';
+import { LEVELS, LEVEL_ORDER, buildLevel } from '../data/levels/index.js';
 import { ENEMIES } from '../data/enemies.js';
 import { DIFFICULTY } from '../data/rules.js';
 import { wrapText } from './game-screen.js';
@@ -114,10 +114,10 @@ export class TitleScreen {
     const ip = app.save.inProgress;
     if (!this.menu) {
       if (ip && btn('t:continue', `CONTINUE (WAVE ${ip.snapshot.wavesEnded + 1})`, 'accent')) app.continueLevel();
-      if (btn('t:play', 'PLAY: KAMINO I', ip ? 'normal' : 'accent')) app.toBriefing('kamino-1');
+      if (btn('t:play', 'CAMPAIGN', ip ? 'normal' : 'accent')) app.toCampaign();
       if (btn('t:settings', 'SETTINGS', 'normal')) this.menu = 'settings';
     }
-    r.text('PHASE 1 VERTICAL SLICE · LOCAL SAVE', 6 + ui.ins.left, ui.vh - 11 - ui.ins.bottom, COLORS.faint);
+    r.text('PHASE 2 FULL CONTENT · LOCAL SAVE', 6 + ui.ins.left, ui.vh - 11 - ui.ins.bottom, COLORS.faint);
     if (ui.vw >= 460) r.text('ARCHIVES · MEDALS · ACCOUNT: LATER PHASES', ui.vw - 6 - ui.ins.right, ui.vh - 11 - ui.ins.bottom, COLORS.faint, { align: 'right' });
     if (this.menu === 'settings' && drawSettings(ui, app)) this.menu = null;
     if (app.save.settings.debug) r.text(`S ${app.sc.S} VIEW ${ui.vw}x${ui.vh} DPR ${app.sc.dpr} TAP ${app.sc.tap}`, 6, 6, COLORS.dim);
@@ -136,7 +136,9 @@ export class BriefingScreen {
     this.difficulty = app.lastDifficulty || 'jedi';
     const types = new Set();
     for (const w of this.def.waves) for (const g of w.groups) types.add(g.type);
-    this.types = [...types];
+    this.types = [...types].filter((t) => !ENEMIES[t].boss);
+    app.ensurePlanet?.(this.def.planet);
+    this.boss = this.def.boss || null;
   }
   update(dt, events) {
     this.t += dt;
@@ -147,7 +149,7 @@ export class BriefingScreen {
       else if (e.type === 'move') ui.move(e.id, e.x, e.y);
       else if (e.type === 'up' || e.type === 'cancel') ui.up(e.id, e.x, e.y);
       else if (e.type === 'key' && e.key === 'Enter') this.deploy();
-      else if (e.type === 'key' && e.key === 'Escape') this.app.toTitle();
+      else if (e.type === 'key' && e.key === 'Escape') this.app.toCampaign();
     }
   }
   deploy() {
@@ -162,7 +164,8 @@ export class BriefingScreen {
     const w = Math.min(420, ui.vw - 16), h = Math.min(ui.vh - 12, 230);
     const x = (ui.vw - w) >> 1, y = (ui.vh - h) >> 1;
     r.panel(x, y, w, h, { title: true });
-    r.text(`KAMINO ${this.def.index} - ${this.def.name.toUpperCase()}`, x + 8, y + 6, COLORS.accent);
+    r.text(`${this.def.planet.toUpperCase()} ${this.def.index} - ${this.def.name.toUpperCase()}`, x + 8, y + 6, COLORS.accent);
+    if (this.boss) r.text(`BOSS: ${ENEMIES[this.boss].name.toUpperCase()}`, x + w - 8, y + 6, COLORS.bad, { align: 'right' });
     // hologram transmission: flicker + typed lines
     const hs = A.hologramSize;
     const flick = this.t < 0.4 ? (Math.floor(this.t * 30) % 2 ? 0.2 : 0.9) : 0.78 + 0.22 * Math.sin(this.t * 37) * Math.sin(this.t * 5.3);
@@ -192,12 +195,16 @@ export class BriefingScreen {
       const ref = set.walk ? set.walk[0] : set.frames[0][0];
       const k = app.sc.HIR;
       const hw = (set.walk ? set.w : set.size) * k, hh = (set.walk ? set.h : set.size * 0.9) * k;
+      if (ex + hw > x + w - 8) break;
       r.hi(ref, ex, ey + 20 - Math.round(hh));
       ex += Math.round(hw) + 6;
     }
     // difficulty
     const dy = y + h - 2 * T - 12;
-    if (ey + 24 + 7 < dy - 10) r.text(this.types.map((t) => ENEMIES[t].name.toUpperCase()).join(', '), x + 8, ey + 24, COLORS.faint);
+    if (ey + 24 + 7 < dy - 10) {
+      const lines = wrapText(this.types.map((t) => ENEMIES[t].name.toUpperCase()).join(', '), Math.floor((w - 16) / 5));
+      lines.forEach((l, i) => { if (ey + 24 + i * 9 + 7 < dy - 10) r.text(l, x + 8, ey + 24 + i * 9, COLORS.faint); });
+    }
     r.text('DIFFICULTY', x + 8, dy - 9, COLORS.dim);
     const dw = Math.floor((w - 16 - 8) / 3);
     ['padawan', 'jedi', 'master'].forEach((d, i) => {
@@ -205,7 +212,7 @@ export class BriefingScreen {
       if (ui.button(`b:diff:${d}`, x + 8 + i * (dw + 4), dy, dw, T, { label: D.name.toUpperCase(), active: this.difficulty === d, sub: T >= 28 ? `${D.lives} LIVES` : null })) this.difficulty = d;
     });
     const by = y + h - T - 6;
-    if (ui.button('b:back', x + 8, by, 70, T, { label: 'BACK' })) app.toTitle();
+    if (ui.button('b:back', x + 8, by, 70, T, { label: 'BACK' })) app.toCampaign();
     if (ui.button('b:go', x + w - 8 - 110, by, 110, T, { label: 'DEPLOY', style: 'accent' })) this.deploy();
     ui.endFrame();
   }
@@ -218,6 +225,20 @@ const TIPS = {
   scuttler: 'SCUTTLER SWARMS SLIP PAST SINGLE-TARGET FIRE. ROCKET SPLASH CLEARS THEM IN BUNCHES.',
   shield: 'SHIELD DROIDS SHRUG OFF BLASTERS. HIT THEM WHILE THEY ROLL, OR USE ROCKETS ONCE THEY DEPLOY.',
   fighter: 'STRIKE FIGHTERS IGNORE THE WALKWAY. BUILD FLAK OR RIFLE SQUADS UNDER THEIR FLIGHT LANE.',
+  commando: 'COMMANDOS WEAR PLATE. ROCKETS, ARTILLERY AND SHARPSHOOTERS DO FAR MORE THAN BLASTERS.',
+  tank: 'HEAVY TANKS COST 3 LIVES. FOCUS THEM WITH SHARPSHOOTERS OR A TANDEM LAUNCHER.',
+  shieldwalker: 'SHIELD WALKERS BUBBLE EVERYTHING NEAR THEM. ION CANNONS STRIP SHIELDS AT 250%.',
+  carrier: 'CARRIERS SPILL SIX SCUTTLERS WHEN THEY DIE. KEEP SPLASH BEHIND YOUR ANTI-ARMOR.',
+  bomber: 'BOMBERS DROP TROOPERS WHEN SHOT DOWN. KILL THEM EARLY ON THEIR LANE, WITH GROUND GUNS BEHIND.',
+  crawler: 'CRAWLERS CARRY SHIELDS AND ARMOR. ION FIRST, THEN EXPLOSIVES OR PIERCING.',
+  repair: 'REPAIR DRONES HEAL EVERYTHING AROUND THEM. SET A FLAK OR RIFLE TOWER TO AIR PRIORITY.',
+  siege: 'SIEGE WALKERS COST 5 LIVES. STACK ARMOR BREAKERS AND HOWITZERS ON ONE STRETCH OF ROAD.',
+  tactical: 'TACTICAL DROIDS SPEED UP THEIR GROUP. TARGET STRONGEST TO DROP THEM FIRST.',
+  tidebreaker: 'THE TIDEBREAKER IS ARMORED. ARTILLERY AND ROCKETS ALONG ITS WHOLE ROUTE.',
+  foundry: 'DESTROY THE FOUNDRY VENTS TO SLOW THE DROIDS IT BUILDS.',
+  reaper: 'THE REAPER SHELL SHRUGS OFF BLASTERS AND ION. KEEP EXPLOSIVES AND SNIPERS FOR PHASE 2.',
+  dreadnought: 'THE DREADNOUGHT FLIES. MASS FLAK AND INTERCEPTORS UNDER ITS LANE, SPREAD OUT AGAINST LIGHTS-OUT.',
+  warlord: 'THE WARLORD GOES SHIELDED, THEN BERSERK. HAVE ION FOR PHASE 2 AND SPLASH FOR ITS MINIONS.',
 };
 
 export class ResultScreen {
@@ -277,9 +298,73 @@ export class ResultScreen {
     stat('CREDITS EARNED', res.credits);
     stat('TIME', `${Math.floor(res.seconds / 60)}:${String(Math.floor(res.seconds % 60)).padStart(2, '0')}`);
     const by = y + h - T - 8;
-    const bw = Math.floor((w - 16 - 8) / 2);
-    if (ui.button('r:retry', x + 8, by, bw, T, { label: res.won ? 'REPLAY' : 'RETRY', style: res.won ? 'normal' : 'accent' })) app.startLevel(res.levelId, res.difficulty);
-    if (ui.button('r:menu', x + 16 + bw, by, bw, T, { label: 'MENU', style: res.won ? 'accent' : 'normal' })) app.toTitle();
+    const next = LEVEL_ORDER[LEVEL_ORDER.indexOf(res.levelId) + 1];
+    const bw3 = Math.floor((w - 16 - 8) / 3);
+    if (ui.button('r:retry', x + 8, by, bw3, T, { label: res.won ? 'REPLAY' : 'RETRY', style: res.won ? 'normal' : 'accent' })) app.startLevel(res.levelId, res.difficulty);
+    if (ui.button('r:map', x + 12 + bw3, by, bw3, T, { label: 'MAP' })) app.toCampaign();
+    if (ui.button('r:next', x + 16 + 2 * bw3, by, bw3, T, { label: 'NEXT', style: res.won ? 'accent' : 'normal', disabled: !res.won || !next })) app.toBriefing(next);
+    ui.endFrame();
+  }
+}
+
+// -------------------------------------------------------------- campaign ---
+// Level select until the galaxy map arrives (Phase 3): one column per
+// planet, four levels each, unlocked in order by winning the one before.
+const PLANET_NAMES = { kamino: 'KAMINO', geonosis: 'GEONOSIS', kashyyyk: 'KASHYYYK', umbara: 'UMBARA', mustafar: 'MUSTAFAR' };
+const PLANET_COLORS = { kamino: '#7e9ea1', geonosis: '#c08f63', kashyyyk: '#7f8c5e', umbara: '#a46cff', mustafar: '#ff6a1f' };
+
+export function levelUnlocked(app, id) {
+  const i = LEVEL_ORDER.indexOf(id);
+  if (i <= 0 || app.unlockAll) return true;
+  return (app.save.levels[LEVEL_ORDER[i - 1]]?.wins || 0) > 0;
+}
+
+export class CampaignScreen {
+  constructor(app) {
+    this.app = app;
+    this.bg = new Backdrop(app);
+    app.audio.playMusic('galaxy');
+  }
+  update(dt, events) {
+    this.bg.update(dt);
+    const ui = this.app.ui;
+    for (const e of events) {
+      if (e.type === 'down') ui.down(e.id, e.x, e.y);
+      else if (e.type === 'move') ui.move(e.id, e.x, e.y);
+      else if (e.type === 'up' || e.type === 'cancel') ui.up(e.id, e.x, e.y);
+      else if (e.type === 'key' && e.key === 'Escape') this.app.toTitle();
+    }
+  }
+  render() {
+    const app = this.app, r = app.renderer, ui = app.ui, A = app.assets, T = ui.T;
+    r.begin();
+    this.bg.draw(r, ui);
+    ui.beginFrame();
+    const planets = Object.keys(PLANET_NAMES);
+    const colW = Math.min(96, Math.floor((ui.vw - 16 - ui.ins.left - ui.ins.right) / 5));
+    const x0 = Math.round((ui.vw - colW * 5) / 2);
+    const top = 8 + ui.ins.top;
+    r.text('CAMPAIGN', x0, top, COLORS.accent);
+    let stars = 0;
+    for (const id of LEVEL_ORDER) stars += app.save.levels[id]?.stars || 0;
+    r.text(`STARS ${stars} / 60`, x0 + colW * 5 - 2, top, COLORS.warn, { align: 'right' });
+    const y0 = top + 14;
+    const bh = Math.max(T, Math.min(40, Math.floor((ui.vh - y0 - T - 24 - ui.ins.bottom) / 4) - 6));
+    planets.forEach((p, i) => {
+      const x = x0 + i * colW;
+      r.rect(x + 2, y0, colW - 4, 10, PLANET_COLORS[p], 0.25);
+      r.text(PLANET_NAMES[p], x + colW / 2, y0 + 2, COLORS.text, { align: 'center' });
+      LEVEL_ORDER.filter((id) => LEVELS[id].planet === p).forEach((id, j) => {
+        const def = LEVELS[id];
+        const open = levelUnlocked(app, id);
+        const lv = app.save.levels[id];
+        const by = y0 + 14 + j * (bh + 5);
+        if (ui.button(`c:${id}`, x + 2, by, colW - 4, bh, { label: open ? `${def.index} ${def.name.toUpperCase()}`.slice(0, Math.floor((colW - 10) / 5)) : null, icon: open ? null : A.icons.lock, style: def.boss ? 'bad' : 'normal', disabled: !open })) app.toBriefing(id);
+        if (open && bh >= 28) for (let k = 0; k < 3; k++) r.hi(k < (lv?.stars || 0) ? A.icons.star : A.icons.starEmpty, x + colW / 2 - 15 + k * 10, by + bh - 11);
+      });
+    });
+    if (ui.button('c:back', x0, ui.vh - T - 6 - ui.ins.bottom, 70, T, { label: 'BACK' })) app.toTitle();
+    r.text('GALAXY MAP ARRIVES IN PHASE 3', x0 + colW * 5 - 2, ui.vh - 14 - ui.ins.bottom, COLORS.faint, { align: 'right' });
     ui.endFrame();
   }
 }

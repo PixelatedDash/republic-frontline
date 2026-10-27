@@ -310,8 +310,45 @@ export function rainSplash() {
   return maps.map((m) => hd(fromMap(m, { 0: '#d6e4e4', 9: '#8fa5a6' }), false));
 }
 
+// Weather motes (hand-placed): dust (Geonosis), leaves (Kashyyyk), spores
+// (Umbara, glowing), embers (Mustafar).
+const W_LG = { 1: '#c9a27a', 2: '#a06c48', 3: '#7f8c5e', 4: '#8a6a48', 5: '#465334', 6: '#3be3d7', 7: '#a46cff', 8: '#ffb347', 9: '#ff6a1f' };
+const LEAF = [['.33', '345', '45.'], ['3..', '334', '.45'], ['.3.', '345', '.5.'], ['..3', '.34', '345']];
+function weatherSprites() {
+  const m = (rows) => fromMap(rows, W_LG);
+  return {
+    dust: [m(['1']), m(['12']), m(['2'])],
+    leaf: LEAF.map(m),
+    spore: [m(['6']), m(['.6.', '666', '.6.']), m(['7']), m(['.7.', '777', '.7.'])],
+    ember: [m(['8']), m(['9']), m(['8', '9'])],
+  };
+}
+
+// Expanding ion ring for the Pulse Dome (pixel circles, ion ramp).
+export function pulseRing(r, frames = 6) {
+  const out = [];
+  for (let f = 0; f < frames; f++) {
+    const rr = Math.round(r * (0.3 + 0.7 * (f + 1) / frames));
+    const size = rr * 2 + 3;
+    const bm = new Bitmap(size, size);
+    const c = size >> 1;
+    const cols = [ION[1], ION[2], ION[3]];
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) {
+        const d = Math.hypot(x - c, (y - c) * 1.15);
+        const k = Math.abs(d - rr);
+        if (k < 1) bm.set(x, y, rgba(cols[Math.min(2, f >> 1)]));
+        else if (k < 2 && f < frames - 1) bm.set(x, y, rgba(cols[2], 160));
+      }
+    out.push(bm);
+  }
+  return out;
+}
+
 export function buildVfx() {
   return {
+    weather: weatherSprites(),
+    pulse: pulseRing(100),
     boltRep: boltFrames(REPUBLIC_BOLT),
     boltSep: boltFrames(SEPARATIST_BOLT),
     glowRep: glow(REPUBLIC_BOLT[2], 10),

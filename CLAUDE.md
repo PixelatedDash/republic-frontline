@@ -23,7 +23,7 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 - `src/sim/` — pure deterministic simulation (no DOM, no Math.random). State is plain JSON with ids; `sim.events` feed fx/audio/UI
 - `src/fx/` — pooled particles/decals/corpses driven by sim events; dynamic quality
 - `src/ui/` — screens (boot/title/briefing/result), game screen, world draw, HUD widgets (immediate mode), tutorial, settings, debug
-- `src/data/` — towers, enemies, rules (damage table, difficulty, economy), levels, music
+- `src/data/` — towers, enemies (incl. bosses), rules (damage table, difficulty, economy), balance (per-level hp scale), levels (one file per planet; waves are recipes composed by `levels/waves.js`), music
 - `src/save/` — schema (versioned, migrations, merge) + IndexedDB storage
 - `tools/` — Node-only: `export-art.mjs` (+ `art/` helpers incl. headless game), `sim/run.mjs` + `sim/bots.mjs`, `serve.mjs`
 - `tests/` — `node --test` suites
@@ -44,7 +44,9 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 
 ## Sim rules
 - Everything in `src/sim` must stay deterministic: gameplay randomness only via `src/engine/rng.js` on `state.rng`.
-- After changing sim/data, run the tests and the bots (`npm run sim -- --seeds 3`) and note balance changes in BALANCE.md (Phase 2).
+- After changing sim/data, run the tests and the bots, then re-tune and regenerate the report:
+  `node tools/sim/tune.mjs --level <id>` (writes nothing; copy the hp into `src/data/balance.js`) and
+  `node tools/sim/report.mjs --level <id>` per level + `--write <jsons>` for BALANCE_REPORT.md. Explain intent changes in BALANCE.md.
 
 ## Commands
 - `npm install` — dev tools only (`@napi-rs/canvas`, `pptxgenjs`)
@@ -53,5 +55,5 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 - `node tools/art/lint-art.mjs` — orphan-pixel check on every composed tower/enemy/boss/prop frame (Phase 1 + 2)
 - `node tools/serve.mjs [port] [--lan]` — no-cache dev server (`--lan` to test on a phone over Wi-Fi; no service worker over http)
 - `npm test` — unit tests; `node tools/sim/run.mjs --level kamino-1 --difficulty jedi --bot balanced --seeds 5` — headless bots
-- `?skip=1` on the URL jumps straight into Kamino 1 (dev shortcut)
+- `?skip=1` (Kamino 1) or `?skip=<level-id>` jumps into a level; `?unlock=1` opens every level (dev shortcuts)
 - After any art export: open the PNGs in `art-preview/` and critique them against the art rules before presenting.

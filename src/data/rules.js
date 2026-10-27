@@ -1,11 +1,14 @@
 // Global rules: damage table, difficulty, economy, status effects.
 
 // Damage multiplier by damage type vs. target part (spec §6).
+// `shell` is the Timber Reaper's phase-2 armor shell (spec: armored body
+// class with a high multiplier against Blaster/Ion; needs Explosive or
+// Piercing).
 export const DAMAGE = {
-  blaster: { unarmored: 1.0, armored: 0.5, shield: 0.5 },
-  explosive: { unarmored: 1.0, armored: 1.5, shield: 0.75 },
-  ion: { unarmored: 0.75, armored: 0.75, shield: 2.5 },
-  piercing: { unarmored: 1.0, armored: 1.75, shield: 1.0 },
+  blaster: { unarmored: 1.0, armored: 0.5, shield: 0.5, shell: 0.2 },
+  explosive: { unarmored: 1.0, armored: 1.5, shield: 0.75, shell: 1.5 },
+  ion: { unarmored: 0.75, armored: 0.75, shield: 2.5, shell: 0.2 },
+  piercing: { unarmored: 1.0, armored: 1.75, shield: 1.0, shell: 1.75 },
 };
 
 export const DIFFICULTY = {
@@ -32,6 +35,7 @@ export const STATUS = {
   stunImmune: 4,
   bossStunMult: 0.25,
   slowCap: 0.5,
+  relayRadius: 112,
 };
 
 export const SIM_HZ = 60;

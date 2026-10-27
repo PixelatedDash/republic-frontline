@@ -14,16 +14,27 @@ import { rotations, hd } from './rotsprite.js';
 import * as X from './sprites/extras.js';
 import { REPUBLIC_EMBLEM, SEPARATIST_EMBLEM } from './sprites/emblems.js';
 
+const TOWER_BUILDERS = {
+  rifle: buildRifle, rocket: buildRocket, flak: buildFlak,
+  repeater: buildRepeater, artillery: buildArtillery, ion: buildIon, sharpshooter: buildSharpshooter, depot: buildDepot,
+};
+
 function artSteps() {
   return [
     ['towers', () => {
-      const t = { rifle: {}, rocket: {}, flak: {} };
-      for (const tier of TIERS) {
-        t.rifle[tier] = buildRifle(tier);
-        t.rocket[tier] = buildRocket(tier);
-        t.flak[tier] = buildFlak(tier);
+      const t = {};
+      for (const [k, fn] of Object.entries(TOWER_BUILDERS).slice(0, 3)) {
+        t[k] = {};
+        for (const tier of TIERS) t[k][tier] = fn(tier);
       }
       return t;
+    }],
+    ['towers2', (art) => {
+      for (const [k, fn] of Object.entries(TOWER_BUILDERS).slice(3)) {
+        art.towers[k] = {};
+        for (const tier of TIERS) art.towers[k][tier] = fn(tier);
+      }
+      return true;
     }],
     ['enemies', () => ({
       trooper: buildTrooperDroid(),
@@ -32,6 +43,14 @@ function artSteps() {
       shield: buildShieldDroid(),
       fighter: buildStrikeFighter(),
     })],
+    ['enemies2', (art) => {
+      Object.assign(art.enemies, {
+        commando: E2.buildCommando(), tactical: E2.buildTactical(), tank: E2.buildHeavyTank(), carrier: E2.buildCarrier(),
+        shieldwalker: E2.buildShieldWalker(), crawler: E2.buildCrawler(), siege: E2.buildSiegeWalker(),
+        bomber: E2.buildBomber(), repair: E2.buildRepairDrone(),
+      });
+      return true;
+    }],
     ['tiles', () => ({ kamino: buildKaminoTiles() })],
     ['vfx', () => buildVfx()],
     ['emblems', () => ({ republic: hd(fromMap(REPUBLIC_EMBLEM)), separatist: hd(fromMap(SEPARATIST_EMBLEM)) })],
@@ -53,7 +72,8 @@ export function buildArt(onProgress = () => {}) {
   const steps = artSteps();
   const art = {};
   steps.forEach(([name, fn], i) => {
-    art[name] = fn();
+    const v = fn(art);
+    if (v !== true) art[name] = v;
     onProgress((i + 1) / steps.length, name);
   });
   return art;
@@ -66,26 +86,28 @@ export async function buildArtAsync(onProgress = () => {}) {
   const art = {};
   for (let i = 0; i < steps.length; i++) {
     await new Promise((r) => setTimeout(r, 0));
-    art[steps[i][0]] = steps[i][1]();
+    const v = steps[i][1](art);
+    if (v !== true) art[steps[i][0]] = v;
     onProgress((i + 1) / steps.length, steps[i][0]);
   }
   return art;
 }
 
-// Phase 2 content (art checkpoint). Kept apart from buildArt() until it is
-// approved and wired into the game.
+// Per-planet art built on demand (when a level of that planet is opened):
+// the land tileset and the planet's boss. Kamino's tiles are always built.
+const BOSS_BUILDERS = { tidebreaker: buildTidebreaker, foundry: buildFoundry, reaper: buildReaper, dreadnought: buildDreadnought, warlord: buildWarlord };
+export const PLANET_BOSS = { kamino: 'tidebreaker', geonosis: 'foundry', kashyyyk: 'reaper', umbara: 'dreadnought', mustafar: 'warlord' };
+export function buildPlanetArt(planet) {
+  const boss = PLANET_BOSS[planet];
+  return { tiles: planet === 'kamino' ? null : buildLandTiles(planet), boss: { type: boss, art: BOSS_BUILDERS[boss]() } };
+}
+
+// Everything at once (deck export, lint).
 export function buildArtPhase2() {
-  const towers = {};
-  for (const [k, fn] of [['repeater', buildRepeater], ['artillery', buildArtillery], ['ion', buildIon], ['sharpshooter', buildSharpshooter], ['depot', buildDepot]]) {
-    towers[k] = {};
-    for (const t of TIERS) towers[k][t] = fn(t);
-  }
-  const enemies = {
-    commando: E2.buildCommando(), tactical: E2.buildTactical(), tank: E2.buildHeavyTank(), carrier: E2.buildCarrier(),
-    shieldwalker: E2.buildShieldWalker(), crawler: E2.buildCrawler(), siege: E2.buildSiegeWalker(),
-    bomber: E2.buildBomber(), repair: E2.buildRepairDrone(),
-  };
-  const bosses = { tidebreaker: buildTidebreaker(), foundry: buildFoundry(), reaper: buildReaper(), dreadnought: buildDreadnought(), warlord: buildWarlord() };
+  const art = buildArt();
+  const towers = Object.fromEntries(Object.keys(TOWER_BUILDERS).slice(3).map((k) => [k, art.towers[k]]));
+  const enemies = Object.fromEntries(['commando', 'tactical', 'tank', 'carrier', 'shieldwalker', 'crawler', 'siege', 'bomber', 'repair'].map((k) => [k, art.enemies[k]]));
+  const bosses = Object.fromEntries(Object.entries(BOSS_BUILDERS).map(([k, fn]) => [k, fn()]));
   const tiles = Object.fromEntries(['geonosis', 'kashyyyk', 'umbara', 'mustafar'].map((p) => [p, buildLandTiles(p)]));
   return { towers, enemies, bosses, tiles };
 }

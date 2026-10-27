@@ -76,3 +76,11 @@
 - Repair Drone and Droid Carrier are on the small side next to towers; fine at default zoom, revisit if they get lost in swarms.
 - Kashyyyk ravine and Geonosis chasm are mostly static (8 frames of slow drift); weather particles will carry most of the motion.
 - Docs commit with the live URL and these commits still need a push from GitHub Desktop.
+
+## 2026-10-27 — Phase 2 (full content) — in progress
+
+**Done so far**
+- Sim: all 8 towers (spin-up, min range + lobbed shells, barrage, stun / chain arc / pulse, hitscan sniper with pierce and armor break, depot income, relay aura), all 14 droids (bubble shields, speed aura, heal aura, carrier split, bomber drops), all 5 bosses (phases, Foundry vents as weak points, spawners, Tidebreaker emerge, Dreadnought bombers + lights-out), boss leak table, v1 snapshot migration.
+- 19 new levels (20 total) across 5 planets, hand-written wave recipes + composer, per-level hp scale from `tools/sim/tune.mjs`.
+- Rendering: every tower/droid/boss, planet ground layers, props, weather per planet, Umbara night + tower lights, beams (sniper tracer, ion arc), pulse rings, artillery arcs, boss cinematic, boss HP bar, depot info panel, campaign level select, per-planet music.
+- Bots updated (coverage maps, per-layer need, lookahead, depots); `tools/sim/report.mjs` writes BALANCE_REPORT.md; 48 unit tests.

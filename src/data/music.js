@@ -12,6 +12,7 @@ const CH = {
   Dm: ['D3', 'F3', 'A3'], Bb: ['Bb2', 'D3', 'F3'], Gm: ['G2', 'Bb2', 'D3'], A: ['A2', 'C#3', 'E3'],
   F: ['F2', 'A2', 'C3'], C: ['C3', 'E3', 'G3'], Em: ['E3', 'G3', 'B3'], D: ['D3', 'F#3', 'A3'],
   B: ['B2', 'D#3', 'F#3'], Am: ['A2', 'C3', 'E3'], G: ['G2', 'B2', 'D3'], Cm: ['C3', 'Eb3', 'G3'],
+  Ab: ['Ab2', 'C3', 'Eb3'], Fm: ['F2', 'Ab2', 'C3'], E: ['E2', 'G#2', 'B2'],
 };
 const up = (n, oct = 1) => n.replace(/\d$/, (d) => String(Number(d) + oct));
 
@@ -61,6 +62,10 @@ const KAMINO = ['Dm', 'Bb', 'Gm', 'A', 'Dm', 'F', 'C', 'A'];
 const MENU = ['F', 'C', 'Dm', 'Bb', 'F', 'C', 'Bb', 'C'];
 const BOSS = ['Em', 'Em', 'C', 'D', 'Em', 'Em', 'C', 'B'];
 const GALAXY = ['Am', 'F', 'C', 'G'];
+const GEONOSIS = ['Em', 'F', 'Em', 'D', 'Em', 'F', 'G', 'E'];
+const KASHYYYK = ['Am', 'Em', 'F', 'C', 'Am', 'G', 'F', 'Em'];
+const UMBARA = ['Cm', 'Ab', 'Fm', 'G', 'Cm', 'Ab', 'Fm', 'G'];
+const MUSTAFAR = ['Dm', 'Dm', 'Bb', 'C', 'Dm', 'Gm', 'Bb', 'A'];
 
 export const TRACKS = {
   kamino: {
@@ -109,6 +114,62 @@ export const TRACKS = {
       { inst: 'strings', layer: 'base', steps: pad(GALAXY) },
       { inst: 'arp', layer: 'base', steps: arp(GALAXY, [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 1, 2, 3]) },
       { inst: 'bass', layer: 'base', steps: bass(GALAXY, 'x...............') },
+    ],
+  },
+  // Geonosis: dry, driving march in E (flat second), dusty brass.
+  geonosis: {
+    bpm: 100,
+    channels: [
+      { inst: 'bass', layer: 'base', steps: bass(GEONOSIS, 'x..x..x.x..x..x.') },
+      { inst: 'strings', layer: 'base', steps: pad(GEONOSIS) },
+      { inst: 'snare', layer: 'mid', steps: drum('x...x.o.x...x.oo', 8, 0.8) },
+      { inst: 'timpani', layer: 'mid', steps: timp(GEONOSIS, 2) },
+      { inst: 'brass', layer: 'high', steps: melody(`
+        E4 . F4 . E4 . . B3 | C4 . . . B3 . . . | E4 . G4 . F4 . E4 . | D4 . . . - - - - |
+        E4 . F4 . G4 . . A4 | B4 . A4 . G4 . F4 . | G4 . . . F4 . E4 . | E4 . . . - - - - `) },
+      { inst: 'arp', layer: 'high', steps: arp(GEONOSIS, [0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0, 3]) },
+    ],
+  },
+  // Kashyyyk: slow, wooded and wary; plucked arps under long string pads.
+  kashyyyk: {
+    bpm: 84,
+    channels: [
+      { inst: 'strings', layer: 'base', steps: pad(KASHYYYK) },
+      { inst: 'arp', layer: 'base', steps: arp(KASHYYYK, [0, 2, 1, 2, 3, 2, 1, 2, 0, 2, 1, 2, 3, 2, 1, 2]) },
+      { inst: 'bass', layer: 'mid', steps: bass(KASHYYYK, 'x.......x.o.....') },
+      { inst: 'timpani', layer: 'mid', steps: timp(KASHYYYK, 4) },
+      { inst: 'brass', layer: 'high', steps: melody(`
+        A4 . . . E4 . . . | G4 . . . B4 . . . | C5 . . . A4 . . . | G4 . . . E4 . . . |
+        A4 . . . C5 . B4 . | A4 . . . G4 . . . | F4 . A4 . C5 . . . | B4 . . . - - - - `) },
+      { inst: 'snare', layer: 'high', steps: drum('x.......x...o...', 8, 0.6) },
+    ],
+  },
+  // Umbara: near-silent night, low pulse, a lone high line.
+  umbara: {
+    bpm: 72,
+    channels: [
+      { inst: 'strings', layer: 'base', steps: pad(UMBARA) },
+      { inst: 'bass', layer: 'base', steps: bass(UMBARA, 'x...........x...') },
+      { inst: 'arp', layer: 'mid', steps: arp(UMBARA, [0, 3, 1, 3, 2, 3, 1, 3, 0, 3, 1, 3, 2, 3, 1, 3]) },
+      { inst: 'hat', layer: 'mid', steps: drum('..x...x...x...x.', 8, 0.5) },
+      { inst: 'brass', layer: 'high', steps: melody(`
+        C5 . . . . . Bb4 . | Ab4 . . . G4 . . . | F4 . . . Ab4 . C5 . | B4 . . . - - - - |
+        C5 . . . Eb5 . D5 . | C5 . . . Ab4 . . . | F4 . G4 . Ab4 . F4 . | G4 . . . - - - - `) },
+      { inst: 'timpani', layer: 'high', steps: timp(UMBARA, 2) },
+    ],
+  },
+  // Mustafar: the finale; heavy timpani and full brass over a churning bass.
+  mustafar: {
+    bpm: 112,
+    channels: [
+      { inst: 'bass', layer: 'base', steps: bass(MUSTAFAR, 'x.x...x.x.x...xo') },
+      { inst: 'strings', layer: 'base', steps: pad(MUSTAFAR) },
+      { inst: 'timpani', layer: 'base', steps: timp(MUSTAFAR, 1) },
+      { inst: 'snare', layer: 'mid', steps: drum('x..ox..ox..oxoxo', 8, 0.9) },
+      { inst: 'arp', layer: 'mid', steps: arp(MUSTAFAR) },
+      { inst: 'brass', layer: 'high', steps: melody(`
+        D4 . . . A4 . . . | F4 . G4 . A4 . . . | Bb4 . . . A4 . G4 . | A4 . . . - - - - |
+        D5 . . . C5 . Bb4 . | A4 . . . G4 . F4 . | G4 . Bb4 . A4 . G4 . | A4 . . . . . - - `) },
     ],
   },
 };

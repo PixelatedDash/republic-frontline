@@ -14,7 +14,21 @@ export function applyDamage(e, raw, dtype, out = {}) {
   out.dealt = 0;
   out.killed = false;
   let rest = raw;
-  if (e.shield > 0 && e.shieldActive !== false) {
+  // Shield Walker bubble: an outer pool that uses the Shield column too.
+  if (e.bubble > 0) {
+    out.shieldHit = true;
+    const eff = rest * m.shield;
+    if (eff < e.bubble) {
+      e.bubble -= eff;
+      out.dealt += eff;
+      rest = 0;
+    } else {
+      out.dealt += e.bubble;
+      rest -= e.bubble / m.shield;
+      e.bubble = 0;
+    }
+  }
+  if (rest > 0 && e.shield > 0 && e.shieldActive !== false) {
     out.shieldHit = true;
     const eff = rest * m.shield;
     if (eff < e.shield) {
@@ -31,7 +45,7 @@ export function applyDamage(e, raw, dtype, out = {}) {
   }
   if (rest > 0) {
     let bm = m[e.body];
-    if (e.body === 'armored') {
+    if (e.body === 'armored' || e.body === 'shell') {
       out.armorHit = true;
       if (e.armorBreak && e.armorBreak.t > 0) bm = Math.max(bm, e.armorBreak.v);
     }
@@ -146,6 +160,12 @@ export function earlyCallBonus(timeLeft, total, waveIndex, totalWaves) {
 
 // 70% of everything spent; 100% if the tower never fired. Depots: 100% only
 // if no wave has ended since placement.
+// Boss leaks cost the difficulty's bossLeak (a number, or 'loss').
+export function leakCost(d, diff) {
+  if (d.lifeCost !== 'boss') return d.lifeCost;
+  return diff.bossLeak === 'loss' ? Infinity : diff.bossLeak;
+}
+
 export function sellValue(tower, wavesEnded = 0) {
   const full = tower.type === 'depot' ? tower.placedWavesEnded === wavesEnded : !tower.fired;
   return full ? tower.spent : Math.floor(tower.spent * ECONOMY.sellRefund);

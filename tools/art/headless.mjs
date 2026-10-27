@@ -4,7 +4,8 @@
 import { createCanvas } from '@napi-rs/canvas';
 import { Atlas } from '../../src/engine/atlas.js';
 import { Renderer } from '../../src/engine/renderer.js';
-import { buildAssets, towerIcon } from '../../src/engine/assets.js';
+import { buildAssets, towerIcon, planetAssets, nightEnemyAssets } from '../../src/engine/assets.js';
+import { buildPlanetArt } from '../../src/art/index.js';
 import { computeScale } from '../../src/engine/scaling.js';
 import { UI } from '../../src/ui/ui.js';
 import { GameScreen } from '../../src/ui/game-screen.js';
@@ -33,6 +34,15 @@ export function headlessApp(art, cssW, cssH, dpr) {
   app.ui = new UI(app.renderer);
   app.ui.layout(sc, { top: 0, right: 0, bottom: 0, left: 0 });
   app.makeTowerIcon = (type) => towerIcon(art, type);
+  app.planets = {};
+  app.ensurePlanet = (planet) => {
+    if (!app.planets[planet]) {
+      const pa = buildPlanetArt(planet);
+      app.planets[planet] = { tiles: pa.tiles, P: planetAssets(pa, atlas, planet === 'umbara') };
+    }
+    return app.planets[planet];
+  };
+  app.nightEnemies = () => (app.night ||= nightEnemyAssets(art, atlas));
   return { app, canvas };
 }
 
