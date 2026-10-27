@@ -1,0 +1,475 @@
+// Bosses: hand-placed 1x part maps (hull, running gear, weapons, per-phase
+// overlays), assembled and upscaled to 2x detail in art/bosses.js. Ground
+// bosses are side view facing EAST (mirrored for west); the Night
+// Dreadnought is top-down pointing east (RotSprite at load time).
+
+// ================================================================ Tidebreaker
+// Amphibious assault walker (Kamino). A broad armored shell like a sea
+// shield, frontal sensor cluster and ram, six crab legs. Phase 2 opens the
+// dorsal bay doors to deploy troop droids. It rises out of the sea.
+export const TIDE = {
+  shell: [
+    '..................kkkkkkkkkkkkkk',
+    '.............kkkkkaaaaaaaaaaaaaAkkkk',
+    '..........kkkaaaaaaaaaaaaaaaaaaAAAAAkkk',
+    '.......kkkaaaaaaAAAAAAAAAAAAAAAAAAAAAAAkkk',
+    '.....kkaaaaaAAAAAkkkkkkkkkkkkkkkAAAAAAAAAAkk',
+    '....kaaaaAAAAAAAkhhhhhhhhhhhhhhhkAAAAAAAAAAEkk',
+    '...kaaAAAAAAAAAAkhkhhhkhhhkhhhhhkAAAAAAAAAAEEEk',
+    '..kaAAAAAAAAAAAAkkkkkkkkkkkkkkkkkAAAAAAAAAAAEEEk',
+    '..kaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEEEEkkk',
+    '.kaAAAAAkkkAAAAAAAAAkkkAAAAAAAAAAkkkAAAAAAAAAEEEEkRRkk',
+    '.kAAAAAkeeekAAAAAAAkeeekAAAAAAAAkeeekAAAAAAAAEEEEkRQRRk',
+    'kaAAAAAAkkkAAAAAAAAAkkkAAAAAAAAAAkkkAAAAAAAAEEEEEkRRRRk',
+    'kAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEEEEEEkkkkkk',
+    'keeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeEEEEEk',
+    'kgggggggggggggggggggggggggggggggggggggggggggggggggggGGk',
+    'kGGhhGGGGhhGGGGhhGGGGhhGGGGhhGGGGhhGGGGhhGGGGhhGGGGHHk',
+    '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  ],
+  // frontal ram, drawn over the shell's front-lower corner
+  ram: [
+    '.kkkk...',
+    'kgGGHkk.',
+    'kGGGGHHk',
+    'kGhhGGHk',
+    'kGGGGHk.',
+    'khhhHk..',
+    '.kkkk...',
+  ],
+  ramAt: [50, 11],
+  // sensor tower on the shell's crown (drawn behind the shell)
+  tower: [
+    '......kk......',
+    '.....kQk......',
+    '.....khk......',
+    '..kkkkhkkkkk..',
+    '.kgggggggggGk.',
+    'kgGkRkRkRkGHHk',
+    'kGGkkkkkkkGHHk',
+    'kGGGGGGGGGHHHk',
+  ],
+  towerAt: [33, -6],
+  // phase 2: dorsal bay doors open, three troop droids ready to drop
+  bay: [
+    'kkkkkkkkkkkkkkkkkk',
+    'kHHkaakHHkaakHHkak',
+    'kHkaAAkHkaAAkHkaAk',
+    'kHkqRkkHkqRkkHkqRk',
+    'kHkkkHHHkkkHHHkkkk',
+    'kkkkkkkkkkkkkkkkkk',
+  ],
+  bayAt: [16, 4],
+  // crab legs: near (steel) and far (dark), two poses each
+  legs: [
+    [
+      '.kkkk...',
+      'kgGGHk..',
+      'kgGGHk..',
+      '.kgGHk..',
+      '..kgGHk.',
+      '..kgGHk.',
+      '...kgGk.',
+      '...kgGHk',
+      '..kgGGHk',
+      '.kGGGHHk',
+      '.kkkkkkk',
+    ],
+    [
+      '...kkkk.',
+      '..kgGGHk',
+      '..kgGGHk',
+      '..kgGHk.',
+      '.kgGHk..',
+      '.kgGHk..',
+      '.kgGk...',
+      'kgGHk...',
+      'kgGGHk..',
+      'kGGGHHk.',
+      'kkkkkkk.',
+    ],
+  ],
+  legX: [4, 21, 38], // near legs; far legs sit 7px behind, half a cycle out
+};
+
+// ============================================================ Foundry Colossus
+// A crawling droid factory (Geonosis): rust-tan foundry block on long
+// treads, three exhaust stacks (weak points with their own HP), a rear
+// assembly door that opens to release droids, furnace glow in the grille.
+export const FOUNDRY = {
+  // stepped silhouette: tall foundry hall (rear) + low furnace block (front)
+  hull: [
+    '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+    '.kaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaAk',
+    'kaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEEk',
+    'kAAkkkkkkkkkAAAAAAAAAAAAAAAAAAAAAEEk',
+    'kAAkHHHHHHHkAAkkkkkkkkkkkkkkkkkAAEEk',
+    'kAAkhhhhhhhkAAkHkHkHkHkHkHkHkHkAAEEk',
+    'kAAkHHHHHHHkAAkkkkkkkkkkkkkkkkkAAEEk',
+    'kAAkhhhhhhhkAAAAAAAAAAAAAAAAAAAAAEEkkkkkkkkkkkkkkkkkkkkkkkkk',
+    'kAAkHHHHHHHkAAAAAAAAAAAAAAAAAAAAAEEkaaaaaaaaaaaaaaaaaaaaaaaAk',
+    'kAAkhhhhhhhkAAkdkdkdkdkdkdkdkdkAAEEkaAAAAAAAAAAAAAAAAAAAAAAEEk',
+    'kAAkkkkkkkkkAAkkdkdkdkdkdkdkdkdAAEEkAAkkkkkkkkkkkkkkkkkkkAAEEk',
+    'kAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEEkAAkfFfFfFfFfFfFfFfFfkAAEEkk',
+    'keeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeEEkAAkFfFfFfFfFfFfFfFfFkAAEEEk',
+    'kgggggggggggggggggggggggggggggggggGGkAAkkkkkkkkkkkkkkkkkkkAAEEEk',
+    'kGGkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkGGkAAAAAAAAAAAAAAAAAAAAAAAEEEk',
+    'kGGkhHhHhHhHhHhHhHhHhHhHhHhHhHhkGGkeeeeeeeeeeeeeeeeeeeeeeeeEEk',
+    'kGGkkkkkkkkkkkkkkkkkkkkkkkkkkkkkGGkgggggggggggggggggggggggggGk',
+    'khhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhkhhhhhhhhhhhhhhhhhhhhhhhhhHk',
+    'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+  ],
+  // grinding intake jaw on the nose
+  jaw: [
+    'kkkkkkk.',
+    'kgGGGHkk',
+    'kGkGkGHk',
+    'kGGGGGHk',
+    'kkGkGkHk',
+    'kgGGGGHk',
+    'kHkHkHkk',
+    'kkkkkkk.',
+  ],
+  jawAt: [59, 9],
+  // rear assembly door (over the hull's left panel), closed / half / open
+  door: [
+    [
+      'kkkkkkkkk',
+      'kHHHHHHHk',
+      'khhhhhhhk',
+      'kHHHHHHHk',
+      'khhhhhhhk',
+      'kHHHHHHHk',
+      'khhhhhhhk',
+      'kHHHHHHHk',
+      'kkkkkkkkk',
+    ],
+    [
+      'kkkkkkkkk',
+      'kHHHHHHHk',
+      'khhhhhhhk',
+      'kHHHHHHHk',
+      'kkkkkkkkk',
+      'kBBBBBBBk',
+      'kBBBBBBBk',
+      'kBqRBBBBk',
+      'kkkkkkkkk',
+    ],
+    [
+      'kkkkkkkkk',
+      'kHHHHHHHk',
+      'kkkkkkkkk',
+      'kBBBBBBBk',
+      'kBkkkBBBk',
+      'kBaAAkBBk',
+      'kBqRAkBBk',
+      'kBkkkBBBk',
+      'kkkkkkkkk',
+    ],
+  ],
+  doorAt: [3, 3],
+  // exhaust stacks (weak points): intact (2 smoke-glow frames) / destroyed
+  vent: [
+    [
+      '.kkkkkk.',
+      'kfFFFFfk',
+      'kkkkkkkk',
+      'kgGGGGHk',
+      'kgGkkGHk',
+      'kGGGGGHk',
+      'kgGkkGHk',
+      'kGGGGHHk',
+      'kGhhhHHk',
+      'kkkkkkkk',
+    ],
+    [
+      '.kkkkkk.',
+      'kFfFFfFk',
+      'kkkkkkkk',
+      'kgGGGGHk',
+      'kgGkkGHk',
+      'kGGGGGHk',
+      'kgGkkGHk',
+      'kGGGGHHk',
+      'kGhhhHHk',
+      'kkkkkkkk',
+    ],
+  ],
+  ventBroken: [
+    '........',
+    '........',
+    '........',
+    '...kk...',
+    '..kHk.k.',
+    '.kHhkkHk',
+    'kGkhhHHk',
+    'kGGhkHHk',
+    'kGhhhHHk',
+    'kkkkkkkk',
+  ],
+  ventX: [7, 16, 25], // on the foundry hall roof
+  // tread: rows 0-1 roll, row 2 = bogie wheels
+  tread: [
+    'k' + 'HHhh'.repeat(15) + 'k',
+    'k' + 'hHHh'.repeat(15) + 'k',
+    'k' + 'HkgGkh'.repeat(10) + 'k',
+    '.' + 'k'.repeat(60) + '.',
+  ],
+};
+
+// =============================================================== Timber Reaper
+// Saw-armed harvester tank (Kashyyyk): steel chassis with twin exhausts, a
+// tan cab with a sensor slit, two hydraulic arms carrying spinning saw
+// discs. Phase 2 bolts a heavy armor shell over the chassis and cab.
+export const REAPER = {
+  hull: [
+    '...kk.kk',
+    '..kHHkHHk',
+    '..khHkhHk',
+    '..khHkhHkkkkkkkkkkkkkkkkkkkkkkkkk',
+    '.kkhHkhHkgggggggggggggggggggggGGkk',
+    'kgggggggggGGGGGGGGGGGGGGGGGGGGGGHHkkkkkkkkkkk',
+    'kgGGGGGGGGGkkkkkkkkkkkkkkkkkkGGGHHkaaaaaaaaAAkk',
+    'kGGGkkkkGGGkHhHhHhHhHhHhHhHkGGGHHkaAAAAAAAAAAEk',
+    'kGGkhhhhkGGkkkkkkkkkkkkkkkkkGGGHHkaAkkkkkkkAAEEk',
+    'kGGkhkkhkGGGGGGGGGGGGGGGGGGGGGGHHkAAkRRQQRRkAEEk',
+    'kGGkhhhhkGGGGGGGGGGGGGGGGGGGGGGHHkAAkkkkkkkkAEEk',
+    'kGGGkkkkGGGGGGGGGGGGGGGGGGGGGGGHHkAAAAAAAAAAAEEk',
+    'khhhhhhhhhhhhhhhhhhhhhhhhhhhhhhHHkeeeeeeeeeeeEEk',
+    'kHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHkkkkkkkkkkkkk',
+    'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+  ],
+  // hydraulic arms (from the cab front to the saw hubs)
+  armUp: [
+    '........kkkk',
+    '.......kmMNk',
+    '......kmMNk.',
+    '.....kmMNk..',
+    '....kmMNk...',
+    '...kmMNk....',
+    '..kmMNk.....',
+    '.kmMNk......',
+    'kmMNk.......',
+    'kkkk........',
+  ],
+  armLow: [
+    'kkkkkkkkkkkk',
+    'kmmmmmmmmmMk',
+    'kMMkMMkMMMNk',
+    'knnnnnnnnnNk',
+    'kkkkkkkkkkkk',
+  ],
+  armUpAt: [44, -2],
+  armLowAt: [45, 10],
+  sawUpAt: [52, -10],
+  sawLowAt: [53, 4],
+  // saw disc, 2 spin frames (teeth step half a tooth)
+  saw: [
+    [
+      '.....k.k.k.....',
+      '...kkmkmkmkk...',
+      '..kmmmmmmmmMk..',
+      '.kmmMMMMMMMMnk.',
+      'kkmMMMkkkMMMnkk',
+      '.kmMMkNNNkMMnk.',
+      'kkmMMkNkNkMMnkk',
+      '.kmMMkNNNkMMnk.',
+      'kkmMMMkkkMMMnkk',
+      '.kmMMMMMMMMMnk.',
+      '..knnnnnnnnnk..',
+      '...kknknknkk...',
+      '.....k.k.k.....',
+    ],
+    [
+      '......k.k......',
+      '..k.kmkmkmk.k..',
+      '..kmmmmmmmmMk..',
+      '.kmmMMMMMMMMnk.',
+      '.kmMMMkkkMMMnk.',
+      'kkmMMkNNNkMMnkk',
+      '.kmMMkNkNkMMnk.',
+      'kkmMMkNNNkMMnkk',
+      '.kmMMMkkkMMMnk.',
+      '.kmMMMMMMMMMnk.',
+      '..knnnnnnnnnk..',
+      '..k.knknknk.k..',
+      '......k.k......',
+    ],
+  ],
+  // phase 2 armor shell (dark slabs with rivets) over chassis and cab
+  shell: [
+    '.........kkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+    '......kkkgGGGGGGGGGGGGGGGGGGGGGGGGGGGHkkkkkkkkk',
+    '....kkgGGhGhGhGhGhGhGhGhGhGhGhGhGhGhGHHkgGGGGGHkk',
+    '..kkgGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGHHHkGGGGGGHHk',
+    '.kgGGhhhhhhhhhhhhhhhhhhhhhhhhhhhhhGHHHHkGkRRkGHHk',
+    'kgGhhHHHHHHHHHHHHHHHHHHHHHHHHHHHHhGHHHkkGkkkkGHHk',
+    'kGhHHkHHHHHkHHHHHkHHHHHkHHHHHkHHHhGHHHkGGGGGGHHHk',
+    'khHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHhHHHHkhhhhhhHHHk',
+    'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+  ],
+  shellAt: [-1, 3],
+  tread: [
+    'k' + 'HHhh'.repeat(11) + 'Hk',
+    'k' + 'hHHh'.repeat(11) + 'hk',
+    'k' + 'HkgGkh'.repeat(7) + 'HHk',
+    '.' + 'k'.repeat(46) + '.',
+  ],
+};
+
+// ============================================================ Night Dreadnought
+// Air boss (Umbara), top-down pointing east: top half of a long armored
+// gunship (mirrored for the bottom half): engine bank at the rear, turret
+// blisters, bomb-bay hatches, a red sensor prow and running lights.
+export const DREAD_TOP = [
+  'kkkkk',
+  'kfFFkkk',
+  'kFffkHhkk',
+  'kkkkkHHhhkk',
+  'kfFFkHHHhhhkkkkk',
+  'kFffkGGGGhhhhhhhkkkk',
+  'kkkkkGGGGGHhhhhhhhhhkkkk',
+  '.kkhhGGGGGGGGGhhhhhhhhhhkkkk',
+  '..khhhhGGGGGGGGGGHhhhhhhhhhhkkkk',
+  '..khkkkkhGGGGGGGGGGHHHhhhhhhhhhhkkkk',
+  '.khhkgGkhhhGGGGGGGGGGGGGGGhhhhhhhhhhkkkk',
+  'kfFkkGGkhhhhhkkkkkkkkkkkkkkkkHHHhhhhhhhhhkkk',
+  'kFfkhkkhhhhhkhHhHkhHhHkhHhHkkGGGGGhhhhhhhhhRkk',
+  'kkkhhhhhhhhhkGGGGkGGGGkGGGGkkHHHgGkHHHhhhhhhhRRkk',
+  '.khhhhhhhhhhkkkkkkkkkkkkkkkkkHHHGGkGGGGhhhhhhhhhRkk',
+  '.khhhGGGGGGGGGGGGGGGGGGGGGGGGGHHHkkGGGGGHhhhhhhhhhhkkk',
+  '.khhGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGhhhhhhkRRQk',
+];
+export const DREAD_FLAMES = [
+  ['.F', 'Ff'],
+  ['FF', 'Ff'],
+  ['.F', 'fF'],
+];
+
+// =========================================================== The Warlord Engine
+// Mustafar super-walker: a towering armored hull on two hydraulic legs, a
+// command tower with one red eye, twin siege cannons, twin smokestacks and
+// three generator sockets along the flank. Phases are overlays:
+// 1 armor plates bolted over the sockets, 2 sockets glow violet (shield
+// generators) with emitter fins, 3 enrage: plates gone, fire cracks, flaming
+// stacks, the eye burns white.
+export const WARLORD = {
+  hull: [
+    '..........kkk.kkk',
+    '.........kHHkkHHk',
+    '.........khHkkhHk',
+    '.........khHkkhHk..................kkkkkkk',
+    '.........khHkkhHk................kkgggggGHkk',
+    '......kkkkhHkkhHkkkkkkkkkkkkkkkkkgGGGGGGGHHk',
+    '....kkaaaaaaaaaaaaaaaaaaaaaaaaaakgGGkkkkkGHHk',
+    '...kaaaAAAAAAAAAAAAAAAAAAAAAAAAakGGkRRQRRkHHk',
+    '..kaAAAAAAAAAAAAAAAAAAAAAAAAAAAAkGGkkkkkkkHHkk',
+    '..kaAAAAAAAAAAAAAAAAAAAAAAAAAAAAkhhhhhhhhhHHHAkk',
+    '.kaAAAAkkkkkkkkAAAAkkkkkkkkAAAAkkkkkkkkAAAAAAAAAEk',
+    '.kaAAAAkHHHHHHkAAAAkHHHHHHkAAAAkHHHHHHkAAAAAAAAAEEk',
+    '.kAAAAAkHkkkkHkAAAAkHkkkkHkAAAAkHkkkkHkAAAAAAAAAEEk',
+    '.kAAAAAkHkkkkHkAAAAkHkkkkHkAAAAkHkkkkHkAAAAAAAAAEEEk',
+    '.kAAAAAkHHHHHHkAAAAkHHHHHHkAAAAkHHHHHHkAAAAAAAAAEEEk',
+    '.kAAAAAkkkkkkkkAAAAkkkkkkkkAAAAkkkkkkkkAAAAAAAAEEEEk',
+    '.kAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEEEEkkkkkkkkkkkkkkkk',
+    '.keeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeEEEEkgggggggggggggGGk',
+    '.kggggggggggggggggggggggggggggggggggggggggggggggGGGkGGGGGGGGGGGGGHk',
+    '.kGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGHHkkkkkkkkkkkkkkkkkk',
+    '.kGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGHHkgggggggggggggGGk',
+    '.kGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGHHkGGGGGGGGGGGGGHk',
+    '.kGGkkkkkkkkkGGGGGGGGGGGGGGGGkkkkkkkkkGGGGGGGHHHkkkkkkkkkkkkkkkk',
+    '.khkhHHHHHHHkhhhhhhhhhhhhhhkhHHHHHHHkhhhhhhhHHk',
+    '..kkhHkkkkHhkkkkkkkkkkkkkkkkhHkkkkHhkkkkkkkkkk',
+    '...khHHHHHHhk............khHHHHHHhk',
+    '....kkkkkkkk..............kkkkkkkk',
+  ],
+  sockets: [[7, 10], [19, 10], [31, 10]],
+  plate: [
+    'kkkkkkkk',
+    'kgGGGGHk',
+    'kGhGGhHk',
+    'kGGGGGHk',
+    'kGhGGhHk',
+    'kkkkkkkk',
+  ],
+  core: ['VV#V', 'UUVX'],
+  coreDead: ['qkkq', 'kqqk'],
+  fin: ['.k.', 'kVk', 'kUk', 'kXk', 'kgk'],
+  finAt: [[20, 2], [26, 2]],
+  cracks: [
+    '.....F..........F...........',
+    '......f........fF...........',
+    '.......F......f.............',
+    '.......fF....F..............',
+    '........f..........F........',
+    '...................fF.......',
+    '...F.................f......',
+    '...fF.................F.....',
+  ],
+  cracksAt: [4, 8],
+  eyeRage: ['#QQQ#'],
+  eyeAt: [36, 7],
+  stackFlame: [
+    '.F..F.',
+    'FfFFfF',
+    'fkffkf',
+  ],
+  stackFlameAt: [9, -3],
+  // legs: near (steel) / far (dark); two poses, mirrored for the cycle.
+  // Thigh, knee housing, shin, ankle collar and a broad clawed foot.
+  legs: [
+    [
+      '....kkkkkkk.....',
+      '...kgGGGGGHk....',
+      '...kgGGGGGHk....',
+      '....kgGGGGHHk...',
+      '....kgGGGGHHk...',
+      '.....kgGGGGHHk..',
+      '.....kgGGGGHHk..',
+      '....kkkkkkkkkkk.',
+      '...kgGGkkkGGGHk.',
+      '...kGGkhhkGGHHk.',
+      '...kGGGkkGGGHHk.',
+      '....kkkkkkkkkk..',
+      '.....kgGGGHk....',
+      '.....kgGGGHk....',
+      '....kgGGGHk.....',
+      '....kgGGGHk.....',
+      '...kgGGGHk......',
+      '...kgGGGHk......',
+      '...kgGGGHk......',
+      '..kkkkkkkkk.....',
+      '..kgGkkkGHk.....',
+      '.kgGGGGGGGHkkk..',
+      'kgGGGGGGGGGGHHk.',
+      'kkkkkkkkkkkkkkk.',
+    ],
+    [
+      '....kkkkkkk.....',
+      '...kgGGGGGHk....',
+      '...kgGGGGGHk....',
+      '...kgGGGGGHk....',
+      '...kgGGGGHHk....',
+      '...kgGGGGHHk....',
+      '...kgGGGGHHk....',
+      '..kkkkkkkkkkk...',
+      '..kgGGkkkGGHk...',
+      '..kGGkhhkGHHk...',
+      '..kGGGkkGGHHk...',
+      '...kkkkkkkkk....',
+      '....kgGGGHk.....',
+      '....kgGGGHk.....',
+      '....kgGGGHk.....',
+      '....kgGGGHk.....',
+      '....kgGGGHk.....',
+      '....kgGGGHk.....',
+      '....kgGGGHk.....',
+      '...kkkkkkkkk....',
+      '...kgGkkkGHk....',
+      '..kgGGGGGGGHkkk.',
+      '.kgGGGGGGGGGGHHk',
+      '.kkkkkkkkkkkkkkk',
+    ],
+  ],
+  legAt: [[0, 24], [24, 24]], // far, near (hull space)
+};
