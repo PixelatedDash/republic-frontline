@@ -1,7 +1,11 @@
-// Phase 0 art deck. Imports and runs the real src/art code in Node
-// (@napi-rs/canvas for PNG encoding), writes every sprite strip and slide to
-// art-preview/, then builds art-preview.pptx with pptxgenjs. Each slide is a
-// 1920x1080 PNG placed at native size on a 20x11.25in layout (96 px/in).
+// Art deck exporter. Imports and runs the real src/art code in Node
+// (@napi-rs/canvas), writes every sprite strip and slide to art-preview/,
+// then builds art-preview.pptx with pptxgenjs. Each slide is a 1920x1080 PNG
+// placed at native size on a 20x11.25in layout (96 px/in).
+//
+// World art is 2x detail, so sprite strips are exported at 2x (same physical
+// size as the old 4x exports of 1x art). The mockup, readability and HUD
+// slides are frames rendered by the real GameScreen running headless.
 //
 //   node tools/export-art.mjs
 
@@ -16,12 +20,12 @@ import { Bitmap, blit, blitAdd, fill, scale, strip, toCanvas, fromMap, silhouett
 import { composeRifle, composeTurret, DIRS8 } from '../src/art/towers.js';
 import { renderGround } from '../src/art/tilemap.js';
 import * as P from '../src/art/palettes.js';
-import { panel, button, icon, ICONS, rangeCircle, gridCell, logoText } from '../src/art/ui.js';
-import { drawText, FONT5 } from '../src/art/font.js';
+import { button, icon, ICONS, rangeCircle, gridCell, logoText } from '../src/art/ui.js';
+import { MUZZLE_SMALL, MUZZLE_MED } from '../src/art/sprites/troopers.js';
 import { Slide, C, SW, SH, wrap } from './art/slide.mjs';
-import { composeScene } from './art/scene.mjs';
-import { kaminoMockGrid, MOCK_PROPS } from './art/kamino-mock-map.mjs';
-import { VIEW, drawTopHud, drawBuildBar, drawPlacement, drawInfoPanel, towerIcon } from './art/hud.mjs';
+import { headlessApp, startGame, advance, spotsNearPath } from './art/headless.mjs';
+import { build, startWave } from '../src/sim/sim.js';
+import { TILE } from '../src/data/levels/index.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'art-preview');
@@ -29,10 +33,20 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(join(OUT, 'sprites'), { recursive: true });
 mkdirSync(join(OUT, 'slides'), { recursive: true });
 
-const png = (bm, rel, n = 4) => {
+const png = (bm, rel, n = 2) => {
   const f = join(OUT, rel);
   mkdirSync(dirname(f), { recursive: true });
   writeFileSync(f, toCanvas(n === 1 ? bm : scale(bm, n), createCanvas).toBuffer('image/png'));
+};
+const canvasBitmap = (cv) => {
+  const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height);
+  return new Bitmap(cv.width, cv.height, new Uint32Array(d.data.buffer.slice(0)));
+};
+// Exact half-size of a frame rendered at even integer scales.
+const half = (bm) => {
+  const out = new Bitmap(bm.w >> 1, bm.h >> 1);
+  for (let y = 0; y < out.h; y++) for (let x = 0; x < out.w; x++) out.d[y * out.w + x] = bm.d[y * 2 * bm.w + x * 2];
+  return out;
 };
 
 const t0 = Date.now();
@@ -46,9 +60,13 @@ const addSlide = (name, s, notes) => {
   s.save(join(OUT, file));
   slides.push({ file, notes });
 };
+const tiled = (w, h, tile) => {
+  const b = new Bitmap(w, h);
+  for (let j = 0; j < h; j += tile.h) for (let i = 0; i < w; i += tile.w) blit(b, tile, i, j);
+  return b;
+};
 
 // ------------------------------------------------------------ sprite PNGs --
-// Every frame set as a 4x strip (source of truth for review).
 for (const tier of TIERS) {
   const r = art.towers.rifle[tier];
   png(r.back, `sprites/towers/rifle-${tier}-back.png`);
@@ -56,118 +74,119 @@ for (const tier of TIERS) {
   png(strip(DIRS8.map((d) => r.troopers[d].idle.bm), 2), `sprites/towers/rifle-${tier}-trooper-8dir-idle.png`);
   png(strip(DIRS8.map((d) => r.troopers[d].fire.bm), 2), `sprites/towers/rifle-${tier}-trooper-8dir-fire.png`);
   png(strip(DIRS8.map((d) => composeRifle(r, d)), 4), `sprites/towers/rifle-${tier}-composite-8dir.png`);
-  png(composeRifle(r, 'S', { firing: true }), `sprites/towers/rifle-${tier}-firing.png`);
   for (const kind of ['rocket', 'flak']) {
     const t = art.towers[kind][tier];
     png(t.base, `sprites/towers/${kind}-${tier}-base.png`);
-    png(strip(t.frames, 2), `sprites/towers/${kind}-${tier}-head-16dir.png`);
-    png(strip(t.frames.map((_, i) => composeTurret(t, i)), 2), `sprites/towers/${kind}-${tier}-composite-16dir.png`);
-    png(strip(t.frames.map((_, i) => composeTurret(t, i, { firing: true })).filter((_, i) => i % 4 === 0), 2), `sprites/towers/${kind}-${tier}-firing.png`);
+    png(strip(t.frames, 2), `sprites/towers/${kind}-${tier}-head-32dir.png`, 1);
+    png(strip(t.frames.map((_, i) => composeTurret(t, i)).filter((_, i) => i % 2 === 0), 2), `sprites/towers/${kind}-${tier}-composite-16of32.png`, 1);
   }
 }
 for (const [k, e] of Object.entries(art.enemies)) {
   if (k === 'fighter') {
-    png(strip(e.frames[0], 2), `sprites/enemies/fighter-16dir-a.png`);
-    png(strip(e.frames[1], 2), `sprites/enemies/fighter-16dir-b.png`);
-    png(strip(e.shadows, 2), `sprites/enemies/fighter-shadow-16dir.png`);
-    png(strip(e.death, 2), `sprites/enemies/fighter-death.png`);
+    e.frames.forEach((set, i) => png(strip(set, 2), `sprites/enemies/fighter-32dir-thrust${i}.png`, 1));
+    png(strip(e.death, 2), 'sprites/enemies/fighter-death.png');
     continue;
   }
-  png(strip(e.walk, 2), `sprites/enemies/${k}-walk.png`);
-  png(strip(e.walkW, 2), `sprites/enemies/${k}-walk-west.png`);
-  png(strip(e.death, 2), `sprites/enemies/${k}-death.png`);
+  png(strip(e.walk, 2), `sprites/enemies/${k}-walk-6f.png`);
+  png(strip(e.death, 2), `sprites/enemies/${k}-death-6f.png`);
   if (e.roll) png(strip([...e.roll, ...e.deploy], 2), `sprites/enemies/${k}-roll-deploy.png`);
 }
 png(strip(K.ground, 0), 'sprites/tiles/kamino-ground.png');
-png(K.path, 'sprites/tiles/kamino-path.png');
-png(K.pad, 'sprites/tiles/kamino-pad.png');
-png(strip(K.water, 0), 'sprites/tiles/kamino-water-4f.png');
-png(K.cliff, 'sprites/tiles/kamino-cliff.png');
-png(K.bridgeFace, 'sprites/tiles/kamino-bridge-face.png');
+png(strip([K.path, K.pad, K.cliff, K.bridgeFace], 0), 'sprites/tiles/kamino-path-pad-edge-bridge.png');
+png(strip(K.water, 0), 'sprites/tiles/kamino-water-8f.png');
 for (const [n, b] of Object.entries(K.props)) png(b, `sprites/props/kamino-${n}.png`);
-for (const [n, v] of Object.entries(art.vfx)) {
-  if (Array.isArray(v)) png(strip(v, 2), `sprites/vfx/${n}.png`);
-  else png(v, `sprites/vfx/${n}.png`);
-}
+for (const [n, v] of Object.entries(art.vfx)) png(Array.isArray(v) ? strip(v, 2) : v, `sprites/vfx/${n}.png`);
 for (const n of Object.keys(ICONS)) png(icon(n), `sprites/ui/icon-${n}.png`);
-png(art.emblems.republic, 'sprites/ui/emblem-republic.png', 8);
-png(art.emblems.separatist, 'sprites/ui/emblem-separatist.png', 8);
+png(art.emblems.republic, 'sprites/ui/emblem-republic.png', 4);
+png(art.emblems.separatist, 'sprites/ui/emblem-separatist.png', 4);
 
-// ------------------------------------------------------------ map mockup ---
-const GRID = kaminoMockGrid();
-const MOCK = {
-  ox: 4 * 16, oy: 0,
-  props: MOCK_PROPS,
-  towers: [
-    { type: 'rifle', tier: 't2', tx: 8, ty: 5, dir: 'E', firing: true },
-    { type: 'rocket', tier: 't1', tx: 13, ty: 6, dir: 2 },
-    { type: 'flak', tier: 't1', tx: 22, ty: 6, dir: 12, firing: true },
-    { type: 'rocket', tier: 't3', tx: 26, ty: 6, dir: 6, firing: true },
-    { type: 'rifle', tier: 't1', tx: 28, ty: 9, dir: 'W' },
-    { type: 'flak', tier: 't2', tx: 6, ty: 9, dir: 14 },
-  ],
-  enemies: [
-    { type: 'trooper', x: 11 * 16 + 8, y: 7 * 16 + 10, frame: 1, facing: 'E' },
-    { type: 'trooper', x: 11 * 16 + 4, y: 6 * 16 + 4, frame: 3, facing: 'E' },
-    { type: 'rush', x: 17 * 16, y: 8 * 16 + 12, frame: 2, facing: 'E' },
-    { type: 'shield', x: 21 * 16, y: 8 * 16 + 12, frame: 0, facing: 'E', anim: 'roll' },
-    { type: 'trooper', x: 24 * 16 + 8, y: 6 * 16 + 12, frame: 0, facing: 'E' },
-    { type: 'scuttler', x: 27 * 16, y: 4 * 16 + 12, frame: 1, facing: 'E' },
-    { type: 'scuttler', x: 28 * 16 + 2, y: 4 * 16 + 9, frame: 3, facing: 'E' },
-    { type: 'scuttler', x: 29 * 16 - 3, y: 4 * 16 + 13, frame: 0, facing: 'E' },
-    { type: 'scuttler', x: 30 * 16, y: 4 * 16 + 10, frame: 2, facing: 'E' },
-    { type: 'trooper', x: 19 * 16, y: 8 * 16 + 13, frame: 2, facing: 'E', anim: 'death' },
-  ],
-  air: [{ x: 18 * 16, y: 3 * 16, dir: 1, alt: 26 }, { x: 31 * 16, y: 13 * 16, dir: 14, alt: 24, frame: 1 }],
-  bolts: [
-    { x: 10 * 16 + 6, y: 6 * 16 + 4, dir: 0 }, { x: 13 * 16, y: 6 * 16 + 4, dir: 1 },
-    { x: 22 * 16 + 12, y: 4 * 16 + 4, dir: 13 }, { x: 23 * 16, y: 7 * 16, dir: 9, side: 'sep' },
-    { x: 26 * 16, y: 9 * 16 + 4, dir: 7, side: 'sep' },
-  ],
-  fx: [],
-  decals: [],
-};
-MOCK.decals.push({ bm: art.vfx.scorch[1], x: 15 * 16, y: 8 * 16 + 8 }, { bm: art.vfx.scorch[0], x: 25 * 16 + 4, y: 5 * 16 + 4 }, { bm: art.vfx.scorch[2], x: 20 * 16, y: 4 * 16 });
-MOCK.fx.push(
-  { bm: art.vfx.expM[3], x: 24 * 16 + 4, y: 4 * 16 + 4, glow: art.vfx.glowFire },
-  { bm: art.vfx.smoke[2], x: 15 * 16 + 4, y: 7 * 16 + 10 },
-  { bm: art.vfx.smokeBig[3], x: 20 * 16, y: 3 * 16 + 4 },
-  { bm: art.vfx.sparksRep[0], x: 11 * 16 + 9, y: 7 * 16 },
-  { bm: art.vfx.expS[2], x: 18 * 16 + 4, y: 2 * 16 + 4, glow: art.vfx.glowFire },
-);
-const mockup = composeScene(art, GRID, MOCK, { ox: MOCK.ox, oy: MOCK.oy, w: 480, h: 270 });
+// ------------------------------------------------------- in-game frames ----
+// One battle state shared by the mockup / readability / UI shots: real
+// Kamino 1 level, every tower variant, the mixed final wave in progress.
+function stageBattle(app) {
+  const g = startGame(app, { levelId: 'kamino-1', difficulty: 'jedi', seed: 11 });
+  const s = g.sim.state;
+  s.credits = 99999;
+  const view = { x0: 19, y0: 1, x1: 41, y1: 15 }; // tiles around the first bridge
+  const free = (p, n) => s.towers.every((t) => {
+    const m = t.type === 'rifle' ? 2 : 1;
+    return p.tx >= t.tx + m + 1 || p.tx + n + 1 <= t.tx || p.ty >= t.ty + m + 1 || p.ty + n + 1 <= t.ty;
+  });
+  for (const tier of TIERS)
+    for (const type of ['rifle', 'rocket', 'flak']) {
+      const n = type === 'rifle' ? 2 : 1;
+      const ok = (p) => p.d > 24 && p.d < 110 && p.tx >= view.x0 && p.ty >= view.y0 && p.tx + n <= view.x1 && p.ty + n <= view.y1 && free(p, n);
+      const spot = spotsNearPath(g.sim, type).find((p) => ok(p) && build(g.sim, type, p.tx, p.ty).ok);
+      if (spot) s.towers[s.towers.length - 1].tier = tier;
+    }
+  s.waveIndex = 11; // final wave: every droid type
+  startWave(g.sim);
+  advance(g, 60 * 6); // towers fire for a while: scorch marks, smoke
+  // then line up one of each droid type along the visible walkway / lane
+  s.pending.length = 0;
+  const lineup = [['trooper', 180], ['trooper', 240], ['rush', 320], ['trooper', 400], ['shield', 520, 'walk'], ['scuttler', 600], ['scuttler', 614], ['scuttler', 628], ['scuttler', 642], ['shield', 760, 'roll'], ['rush', 860], ['trooper', 940], ['fighter', 420], ['fighter', 640]];
+  lineup.forEach(([type], i) => s.pending.push({ at: s.time, type, path: 0, lane: 0, wave: 11, o: i }));
+  s.waveLeft[11] += lineup.length;
+  advance(g, 1);
+  const fresh = s.enemies.slice(-lineup.length);
+  fresh.forEach((e, i) => {
+    const [, dist, mode] = lineup[i];
+    e.dist = dist;
+    if (mode === 'walk') { e.mode = 'walk'; e.shieldActive = true; }
+    e.hp = e.maxHp * 4; // survive the next few frames
+    e.maxHp = e.hp;
+  });
+  advance(g, 20);
+  s.credits = 640;
+  g.creditsShown = 640;
+  g.cam.centerOn(29 * TILE, 8.5 * TILE);
+  advance(g, 2);
+  return g;
+}
+
+function frame(cssW, cssH, dpr, setup) {
+  const { app, canvas } = headlessApp(art, cssW, cssH, dpr);
+  const g = stageBattle(app);
+  setup?.(g, app);
+  g.render();
+  return { bm: canvasBitmap(canvas), g, app };
+}
+
+const shot1080 = frame(1920, 1080, 1);
+const mock = frame(960, 540, 1, (g) => { g.hideHud = true; });
+png(mock.bm, 'kamino-mockup-1x.png', 1);
+png(shot1080.bm, 'readability-1080p.png', 1);
+
 // ------------------------------------------------------------ slide 1 -------
 {
   const s = new Slide('', '');
   const logo1 = logoText('REPUBLIC', 3);
   const logo2 = logoText('FRONTLINE', 3, ['#a8f4ff', '#7cf0ff', '#38b8e0', '#1d6f95']);
-  s.img(art.emblems.republic, 96, 90, 8);
+  s.img(art.emblems.republic, 96, 90, 4);
   s.img(logo1, 300, 96, 2);
   s.img(logo2, 300, 96 + logo1.h * 2 + 8, 2);
-  s.text('PHASE 0 - ART DIRECTION PREVIEW', 304, 96 + (logo1.h + logo2.h) * 2 + 30, { n: 3, color: C.dim });
-  s.img(art.emblems.separatist, 1690, 110, 6);
+  s.text('ART DIRECTION · 2X DETAIL', 304, 96 + (logo1.h + logo2.h) * 2 + 30, { n: 3, color: C.dim });
+  s.img(art.emblems.separatist, 1690, 110, 3);
   s.text('SEPARATIST', 1688, 210, { n: 2, color: C.dim });
   const pts = [
     'VIEW: TOP-DOWN 3/4 (CLASSIC 16-BIT RPG ANGLE). FRONTS AND TOPS VISIBLE. UNITS AND TOWERS Y-SORTED WITH DROP SHADOWS. LIGHT FROM THE TOP-LEFT.',
-    'TILES ARE 16x16 ART PX. MAPS ARE ABOUT 48x28 TILES (768x448), LARGER THAN THE SCREEN, WITH PAN AND INTEGER ZOOM.',
-    'SCREEN SCALE S IS ALWAYS AN INTEGER: THE LARGEST S WITH FLOOR(DEVICE HEIGHT / S) >= 260. IPHONE 12 LANDSCAPE: S=4, VIEW 633x292. 1080P: S=4, 480x270. 1440P: S=5, 512x288.',
-    'WORLD ZOOM W IS AN INTEGER FROM FIT-MAP UP TO 3S. POSITIONS SNAP TO WHOLE ART PIXELS. SMOOTHING OFF EVERYWHERE.',
+    'WORLD ART IS 2X DETAIL: TILES ARE 32x32 ART PX, MAPS 48x28 TILES (1536x896). UI ART AND FONTS STAY AT THE SPEC SCALE SO TEXT STAYS READABLE.',
+    'UI SCALE S = LARGEST INTEGER WITH FLOOR(DEVICE HEIGHT / S) >= 260. WORLD SCALE SW = SAME RULE AT 520. IPHONE 12: S=4, SW=2. 1080P: S=4, SW=2. 1440P: S=5, SW=2.',
+    'WORLD ZOOM IS AN INTEGER AT REST (FIT-MAP UP TO 3 x SW), EASED OVER 120 MS BETWEEN STEPS. PANNING HAS MOMENTUM.',
     'PALETTE: MUTED, DESATURATED ENVIRONMENTS. ONLY ENERGY IS SATURATED - REPUBLIC BOLTS BLUE/CYAN, SEPARATIST BOLTS RED/ORANGE, ION WHITE-BLUE, DROID SHIELDS VIOLET.',
-    'SPRITES ARE HAND-PLACED PIXEL MAPS (STRINGS OF PALETTE KEYS) IN SRC/ART. CODE ONLY DOES PALETTE SWAPS, TIER OVERLAYS, FLASHES, OUTLINES AND FRAME ASSEMBLY.',
-    '1PX DARK OUTLINES, 3-4 SHADE RAMPS PER MATERIAL, NO PILLOW SHADING, NO ORPHAN PIXELS.',
-    'TURRET AIM: 16 DIRECTIONS BUILT AT LOAD TIME WITH ROTSPRITE (SCALE2X x3, ROTATE, MAJORITY DOWNSAMPLE, ORPHAN CLEANUP). TROOPERS: 5 HAND-AUTHORED FACINGS + MIRRORS = 8.',
-    'GLOWS ARE PIXEL-RING HALOS DRAWN ADDITIVELY, ONE COMPOSITE SWITCH PER LAYER. NO BLUR FILTERS.',
-    'EVERY IMAGE IN THIS DECK IS RENDERED BY TOOLS/EXPORT-ART.MJS FROM THE SAME SRC/ART CODE THE GAME RUNS.',
+    'CHARACTERS, TILES AND WALK POSES ARE HAND-PLACED 2X PIXEL MAPS. TURRET PARTS, PROPS, ICONS AND EMBLEMS ARE HAND-PLACED THEN UPSCALED (SCALE2X + 1PX OUTLINES + RIM LIGHT).',
+    'ANIMATION: 6-FRAME WALKS AND DEATHS, 8 TROOPER FACINGS WITH BREATHING AND RECOIL, 32 TURRET AND FIGHTER HEADINGS (ROTSPRITE) WITH SMOOTHED TURNING, 10-15 FRAME FIREBALLS.',
+    'GLOWS ARE PIXEL-RING HALOS DRAWN ADDITIVELY, ONE COMPOSITE SWITCH PER LAYER. NO BLUR FILTERS. NO ORPHAN PIXELS (LINT CHECKED).',
+    'EVERY IMAGE IN THIS DECK IS RENDERED FROM SRC/ART; MOCKUP, READABILITY AND HUD SLIDES ARE FRAMES FROM THE REAL GAME RUNNING HEADLESS.',
   ];
   let y = 430;
   for (const p of pts) {
     fill(s.bm, 100, y + 4, 8, 8, C.accent);
-    y += s.lines(wrap(p, 120), 124, y, { n: 2 }) + 10;
+    y += s.lines(wrap(p, 112), 124, y, { n: 2 }) + 10;
   }
-  // first look: a slice of the battlefield at 2x
-  s.img(crop(mockup, 150, 40, 300, 200), 1260, 460, 2);
-  s.text('KAMINO, DEFAULT ZOOM, 2X', 1260, 870, { n: 2, color: C.dim });
-  addSlide('title', s, 'Title and art direction summary.');
+  s.img(crop(mock.bm, 300, 120, 580, 400), 1290, 460, 1);
+  s.text('KAMINO 1, IN-GAME FRAME, 1:1', 1290, 870, { n: 2, color: C.dim });
+  addSlide('title', s, 'Title and art direction summary (2x detail).');
 }
 
 // ------------------------------------------------------------ slide 2 -------
@@ -211,38 +230,36 @@ for (const kind of ['rifle', 'rocket', 'flak']) {
   const info = TOWER_INFO[kind];
   const s = new Slide(info.title, info.role);
   const isRifle = kind === 'rifle';
+  const nd = isRifle ? 8 : art.towers[kind].t1.frames.length;
   const raw = (tier, dir, firing) => (isRifle ? composeRifle(art.towers.rifle[tier], DIRS8[dir], { firing }) : composeTurret(art.towers[kind][tier], dir, { firing }));
-  // crop every frame to one shared rect (union of all tiers/dirs) so cells line up
   let ub = null;
-  for (const tier of TIERS) for (let d = 0; d < (isRifle ? 8 : 16); d++) for (const f of [false, true]) {
+  for (const tier of TIERS) for (let d = 0; d < nd; d++) for (const f of [false, true]) {
     const b = bounds(raw(tier, d, f));
     ub = ub ? { x0: Math.min(ub.x0, b.x), y0: Math.min(ub.y0, b.y), x1: Math.max(ub.x1, b.x + b.w), y1: Math.max(ub.y1, b.y + b.h) } : { x0: b.x, y0: b.y, x1: b.x + b.w, y1: b.y + b.h };
   }
   const compose = (tier, dir, firing) => crop(raw(tier, dir, firing), ub.x0, ub.y0, ub.x1 - ub.x0, ub.y1 - ub.y0);
-  const idleDir = isRifle ? 2 : 3, fireDir = isRifle ? 1 : 5;
+  const idleDir = isRifle ? 2 : Math.round(nd * 0.19), fireDir = isRifle ? 1 : Math.round(nd * 0.31);
   const colW = 372;
+  let cellH = 0;
   TIERS.forEach((tier, i) => {
     const x = 36 + i * colW;
     s.text(TIER_NAMES[kind][tier], x, 122, { n: 2, color: tier.startsWith('t4') ? C.warn : C.title });
     s.text(info.tiers[tier], x, 146, { n: 2, color: C.dim });
-    const a = s.cell(compose(tier, idleDir, false), x, 176, 4, { bg: 'checker', pad: 3 });
-    s.cell(compose(tier, idleDir, false), x + a.w + 12, 176, 4, { bg: 'ground', ground: GROUND, pad: 3 });
+    const a = s.cell(compose(tier, idleDir, false), x, 176, 2, { bg: 'checker', pad: 4 });
+    s.cell(compose(tier, idleDir, false), x + a.w + 12, 176, 2, { bg: 'ground', ground: GROUND, pad: 4 });
     const y2 = 176 + a.h + 14;
-    const b = s.cell(compose(tier, fireDir, true), x, y2, 4, { bg: 'checker', pad: 3 });
-    s.cell(compose(tier, fireDir, true), x + b.w + 12, y2, 4, { bg: 'ground', ground: GROUND, pad: 3 });
-
+    s.cell(compose(tier, fireDir, true), x, y2, 2, { bg: 'checker', pad: 4 });
+    s.cell(compose(tier, fireDir, true), x + a.w + 12, y2, 2, { bg: 'ground', ground: GROUND, pad: 4 });
+    cellH = a.h;
   });
-  const cellH = (ub.y1 - ub.y0 + 6) * 4;
   const yRow = 176 + 2 * (cellH + 14) + 16;
-  s.text(isRifle ? 'FIRING ROW ABOVE. AIM SAMPLE: TIER III, ALL 8 TROOPER FACINGS' : 'FIRING ROW ABOVE (RECOIL + FLASH). AIM SAMPLE: TIER III, ALL 16 ROTSPRITE DIRECTIONS', 36, yRow, { n: 2, color: C.accent });
-  const dirs = isRifle ? 8 : 16;
-  const frames = Array.from({ length: dirs }, (_, d) => compose('t3', d, false));
+  s.text(isRifle ? 'IDLE ROW, FIRING ROW (RECOIL + FLASH). AIM SAMPLE: TIER III, ALL 8 TROOPER FACINGS' : `IDLE ROW, FIRING ROW (RECOIL + FLASH). AIM SAMPLE: TIER III, 16 OF ${nd} ROTSPRITE DIRECTIONS`, 36, yRow, { n: 2, color: C.accent });
+  const dirs = isRifle ? [...Array(8).keys()] : [...Array(nd).keys()].filter((d) => d % (nd / 16) === 0);
+  const frames = dirs.map((d) => compose('t3', d, false));
   const fw = frames[0].w + 2;
-  const bar = new Bitmap(fw * dirs + 4, frames[0].h + 6);
-  for (let j = 0; j < bar.h; j += 16) for (let i = 0; i < bar.w; i += 16) blit(bar, GROUND, i, j);
-  frames.forEach((f, d) => blit(bar, f, 3 + d * fw, bar.h - f.h - 3));
-  const scaleN = Math.min(4, Math.floor((SW - 72) / bar.w));
-  s.img(bar, 36, yRow + 28, scaleN);
+  const bar = tiled(fw * frames.length + 4, frames[0].h + 6, GROUND);
+  frames.forEach((f, i) => blit(bar, f, 3 + i * fw, bar.h - f.h - 3));
+  s.img(bar, 36, yRow + 28, Math.max(1, Math.min(2, Math.floor((SW - 72) / bar.w))));
   addSlide(`tower-${kind}`, s, `${info.title}: tiers I-III plus both tier-4 branches. Idle and firing frames on checker and Kamino ground; aim sample below.`);
 }
 
@@ -252,146 +269,99 @@ function enemyRow(s, y, key, frames, death, { extraLabel = '' } = {}) {
   s.text(inf.name, 40, y, { n: 3, color: C.title });
   s.text(inf.role, 40, y + 30, { n: 2, color: C.dim });
   if (extraLabel) s.text(extraLabel, 40, y + 54, { n: 2, color: C.accent });
-  const st = strip(frames, 3);
-  const a = s.cell(st, 520, y, 4, { bg: 'checker', pad: 3 });
-  const b = s.cell(st, 520 + a.w + 16, y, 4, { bg: 'ground', ground: PATHT, pad: 3 });
-  s.cell(strip(death, 3), 520 + a.w + b.w + 32, y, 4, { bg: 'ground', ground: GROUND, pad: 3 });
-  return a.h;
+  const st = strip(frames, 4);
+  const a = s.cell(st, 480, y, 2, { bg: 'checker', pad: 4 });
+  const b = s.cell(st, 480, y + a.h + 10, 2, { bg: 'ground', ground: PATHT, pad: 4 });
+  s.cell(strip(death, 4), 480 + a.w + 24, y, 2, { bg: 'ground', ground: GROUND, pad: 4 });
+  return a.h + b.h + 10;
 }
 {
-  const s = new Slide('Droid army I', 'walk cycles (checker / walkway) + death (flash, spark, collapse, debris)');
+  const s = new Slide('Droid army I', '6-frame walks (checker / walkway) + 6-frame deaths');
   const e = art.enemies;
   let y = 130;
-  y += enemyRow(s, y, 'trooper', e.trooper.walk, e.trooper.death) + 70;
-  y += enemyRow(s, y, 'rush', e.rush.walk, e.rush.death) + 70;
-  y += enemyRow(s, y, 'scuttler', e.scuttler.walk, e.scuttler.death) + 50;
-  // swarm sample
-  s.text('SCUTTLER SWARM AT 1:1 x4', 40, y, { n: 2, color: C.accent });
-  const sw = new Bitmap(160, 40);
-  for (let j = 0; j < 40; j += 16) for (let i = 0; i < 160; i += 16) blit(sw, PATHT, i, j);
-  for (let i = 0; i < 26; i++) blit(sw, e.scuttler.walk[i % 4], 4 + ((i * 53) % 146), 4 + ((i * 11) % 29));
-  s.img(sw, 520, y, 4);
+  y += enemyRow(s, y, 'trooper', e.trooper.walk, e.trooper.death) + 30;
+  y += enemyRow(s, y, 'rush', e.rush.walk, e.rush.death) + 30;
+  y += enemyRow(s, y, 'scuttler', e.scuttler.walk, e.scuttler.death) + 30;
+  s.text('DEATH: FLASH, RECOIL, STAGGER, FALL, COLLAPSE, DEBRIS (FADES)', 40, Math.min(y, 1040), { n: 2, color: C.accent });
   addSlide('enemies-1', s, 'Trooper Droid, Rush Droid, Scuttler.');
 }
 {
   const s = new Slide('Droid army II', 'shield droid modes, strike fighter (air)');
   const e = art.enemies;
   let y = 130;
-  enemyRow(s, y, 'shield', [...e.shield.roll, ...e.shield.deploy, ...e.shield.walk], e.shield.death, { extraLabel: 'ROLL x2, DEPLOY, WALK x4' });
-  // shield up sample
-  y += 130;
-  s.text('SHIELD UP (HEX BUBBLE, VIOLET)', 40, y + 40, { n: 2, color: C.accent });
-  const bub = new Bitmap(28, 30);
-  for (let j = 0; j < 30; j += 16) for (let i = 0; i < 28; i += 16) blit(bub, PATHT, i, j);
-  blit(bub, e.shield.walk[0], 7, 29 - e.shield.walk[0].h);
-  blit(bub, art.vfx.shield[1], 4, 6);
-  s.cell(bub, 520, y, 4, { bg: '#25333b', pad: 0 });
-  y += 160;
+  y += enemyRow(s, y, 'shield', [...e.shield.roll, ...e.shield.deploy, ...e.shield.walk], e.shield.death, { extraLabel: 'TREADS x4, DEPLOY x2, WALK x6' });
+  y += 20;
+  s.text('SHIELD UP (HEX BUBBLE, VIOLET)', 40, y + 30, { n: 2, color: C.accent });
+  const bub = tiled(56, 60, PATHT);
+  blit(bub, e.shield.walk[0], 28 - (e.shield.w >> 1), 58 - e.shield.h);
+  blit(bub, art.vfx.shield[1], 8, 12);
+  s.cell(bub, 480, y, 2, { bg: '#25333b', pad: 0 });
+  y += 140;
   s.text(ENEMY_INFO.fighter.name, 40, y, { n: 3, color: C.title });
   s.text(ENEMY_INFO.fighter.role, 40, y + 30, { n: 2, color: C.dim });
-  s.text('16 ROTSPRITE HEADINGS OVER WATER, SHADOW ON THE SURFACE BELOW', 40, y + 54, { n: 2, color: C.accent });
   const f = e.fighter;
-  const bar = new Bitmap(16 * 22 + 4, 44);
-  for (let j = 0; j < 44; j += 16) for (let i = 0; i < bar.w; i += 16) blit(bar, K.water[0], i, j);
-  for (let d = 0; d < 16; d++) { blit(bar, f.shadows[d], 2 + d * 22 + 5, 20); blit(bar, f.frames[d % 2][d], 2 + d * 22, 2); }
-  s.img(bar, 40, y + 90, 4);
-  y += 90 + 44 * 4 + 30;
-  s.text('THRUSTER FLICKER (2 FRAMES) + DEATH TUMBLE', 40, y, { n: 2, color: C.accent });
-  s.cell(strip([f.frames[0][0], f.frames[1][0]], 3), 40, y + 30, 4, { bg: 'checker', pad: 3 });
-  s.cell(strip(f.death, 3), 400, y + 30, 4, { bg: 'checker', pad: 3 });
-  addSlide('enemies-2', s, 'Shield Droid: rolls on twin treads, deploys into a slow walker with shield up. Strike Fighter: air unit.');
+  s.text(`16 OF ${f.dirs} ROTSPRITE HEADINGS, SHADOW ON THE WATER`, 40, y + 54, { n: 2, color: C.accent });
+  const step = f.dirs / 16;
+  const bar = tiled(16 * 46 + 8, 88, K.water[0]);
+  for (let i = 0; i < 16; i++) { const d = i * step; blit(bar, f.shadows[d], 4 + i * 46 + 11, 44); blit(bar, f.frames[i % 3][d], 4 + i * 46, 2); }
+  s.img(bar, 40, y + 84, 2);
+  y += 84 + 88 * 2 + 24;
+  s.text('THRUSTER FLICKER (3 FRAMES) + DEATH TUMBLE', 40, y, { n: 2, color: C.accent });
+  const c = s.cell(strip(f.frames.map((set) => set[0]), 4), 40, y + 28, 2, { bg: 'checker', pad: 4 });
+  s.cell(strip(f.death, 4), 60 + c.w, y + 28, 2, { bg: 'checker', pad: 4 });
+  addSlide('enemies-2', s, 'Shield Droid: tread sled, deploys into a slow walker with shield up. Strike Fighter: air unit.');
 }
 
 // ------------------------------------------------------------ tileset ------
 {
-  const s = new Slide('Kamino tileset', 'storm ocean, stilted platform city');
+  const s = new Slide('Kamino tileset', '32x32 tiles at 2x detail');
   const items = [
-    ['GROUND A', K.ground[0]], ['GROUND B', K.ground[1]], ['GROUND C', K.ground[2]], ['WALKWAY (PATH)', K.path], ['PAD (NO BUILD)', K.pad],
-    ['WATER F1', K.water[0]], ['WATER F2', K.water[1]], ['WATER F3', K.water[2]], ['WATER F4', K.water[3]], ['PLATFORM EDGE', K.cliff], ['BRIDGE TRUSS', K.bridgeFace],
+    ['GROUND A', K.ground[0]], ['GROUND B', K.ground[1]], ['GROUND C', K.ground[2]], ['WALKWAY (PATH)', K.path], ['PAD (NO BUILD)', K.pad], ['PLATFORM EDGE', K.cliff], ['BRIDGE TRUSS', K.bridgeFace],
   ];
   items.forEach(([n, b], i) => {
-    const x = 40 + (i % 6) * 300, y = 130 + Math.floor(i / 6) * 150;
-    s.img(b, x, y, 6);
-    s.text(n, x, y + 104, { n: 2, color: C.dim });
+    const x = 40 + i * 262;
+    s.img(b, x, 130, 3);
+    s.text(n, x, 236, { n: 2, color: C.dim });
   });
-  let y = 470;
+  s.text('WATER: 8 FRAMES', 40, 280, { n: 2, color: C.accent });
+  s.img(strip(K.water, 4), 40, 306, 3);
+  const y = 440;
   s.text('PROPS (UNBUILDABLE) - CHECKER / GROUND', 40, y, { n: 2, color: C.accent });
   let x = 40;
   for (const [n, b] of Object.entries(K.props)) {
     if (n === 'rail') continue;
-    const c1 = s.cell(b, x, y + 30, 4, { bg: 'checker', pad: 2 });
-    const c2 = s.cell(b, x, y + 40 + c1.h, 4, { bg: 'ground', ground: GROUND, pad: 2 });
+    const c1 = s.cell(b, x, y + 30, 2, { bg: 'checker', pad: 4 });
+    const c2 = s.cell(b, x, y + 40 + c1.h, 2, { bg: 'ground', ground: GROUND, pad: 4 });
     const lw = s.text(n.toUpperCase(), x, y + 50 + c1.h + c2.h, { n: 2, color: C.dim });
     x += Math.max(c1.w, lw) + 40;
   }
-  // autotile sample
   const grid = ['WWWWWWWWW', 'WGGGGWWWW', 'WGPPPBBBP', 'WGPGGWWWG', 'WGPXXWWWG', 'WGPGGGWGG', 'WWWWWWWWW'];
-  const g = renderGround(grid, K, 0);
-  s.text('AUTOTILE SAMPLE x2', 1480, y, { n: 2, color: C.accent });
-  s.img(g, 1480, y + 30, 2);
-  addSlide('kamino-tiles', s, 'Ground variants, walkway, pad, 4-frame water, platform edge with stilts, bridge truss, props, autotile sample.');
+  s.text('AUTOTILE SAMPLE x2', 1300, y, { n: 2, color: C.accent });
+  s.img(renderGround(grid, K, 0), 1300, y + 30, 2);
+  addSlide('kamino-tiles', s, 'Ground variants, walkway, pad, 8-frame water, platform edge with stilts, bridge truss, props, autotile sample.');
 }
 
-png(mockup, 'kamino-mockup-2x.png', 2);
+// ------------------------------------------------------------ map mockup ---
 {
-  const s = new Slide('Kamino map mockup', '480x270 reference view, exported 2x');
-  s.img(mockup, 40, 130, 2);
+  const s = new Slide('Kamino map mockup', 'in-game frame, 960x540 art px (the 480x270 reference view at 2x detail), 1:1');
+  s.img(mock.bm, 40, 130, 1);
   const notes = [
-    'DRAW ORDER: GROUND, DECALS, PATH, SHADOWS, UNITS + TOWERS (Y-SORTED), AIR, BOLTS, PARTICLES, ADDITIVE GLOWS, RAIN, STORM WASH.',
-    'PLATFORMS ARE MID-GRAY SO WHITE CLONE ARMOR AND TAN DROIDS STAY READABLE.',
+    'REAL KAMINO 1 LEVEL, REAL SIM: THE MIXED FINAL WAVE AGAINST ALL 15 TOWER VARIANTS.',
+    'DRAW ORDER: GROUND, DECALS, OVERLAYS, SHADOWS, UNITS + TOWERS (Y-SORTED), AIR, BOLTS, PARTICLES, ADDITIVE GLOWS, WEATHER.',
+    'PLATFORMS ARE MID-GRAY RIVETED PLATES SO WHITE ARMOR AND TAN DROIDS STAY READABLE.',
     'THE WALKWAY GRATING IS THE ENEMY PATH. BRIDGES SHOW A TRUSS; PLATFORM EDGES SHOW STILTS INTO THE SURF.',
-    'WATER, PADS AND PROPS ARE UNBUILDABLE.',
-    'BLUE BOLTS = REPUBLIC, RED BOLTS = SEPARATIST.',
-    'FULL MAP IS 48x28 TILES; THIS IS ONE SCREEN AT DEFAULT ZOOM ON 1080P.',
+    'BLUE BOLTS = REPUBLIC. DROID SHIELDS ARE VIOLET.',
   ];
   let y = 140;
-  for (const n of notes) y += s.lines(wrap(n, 38), 1040, y, { n: 2 }) + 18;
-  addSlide('kamino-mockup', s, 'One screen of the Kamino mockup map with towers, enemies, air units and effects.');
+  for (const n of notes) y += s.lines(wrap(n, 40), 1030, y, { n: 2 }) + 18;
+  addSlide('kamino-mockup', s, 'One screen of Kamino 1 rendered by the game (HUD hidden).');
 }
 
 // ------------------------------------------------------------ readability --
 {
-  const R = {
-    props: MOCK_PROPS,
-    towers: [],
-    enemies: [],
-    air: [],
-    bolts: [],
-    fx: [],
-    decals: [{ bm: art.vfx.scorch[1], x: 22 * 16, y: 21 * 16 }],
-  };
-  // all 15 tower variants on the lower platforms
-  const spots = {
-    rifle: [[4, 16], [4, 21], [11, 24], [13, 15], [6, 24]],
-    rocket: [[7, 17], [8, 17], [10, 17], [12, 17], [14, 18]],
-    flak: [[7, 19], [11, 21], [13, 21], [15, 21], [15, 22]],
-  };
-  for (const kind of ['rifle', 'rocket', 'flak'])
-    TIERS.forEach((tier, i) => {
-      const [tx, ty] = spots[kind][i];
-      R.towers.push({ type: kind, tier, tx, ty, dir: kind === 'rifle' ? DIRS8[(i * 3) % 8] : (i * 5) % 16, firing: i === 2 });
-    });
-  const e = (type, x, y, o = {}) => R.enemies.push({ type, x, y, facing: 'E', frame: (x + y) % 4, ...o });
-  e('trooper', 3 * 16, 20 * 16 + 10);
-  e('trooper', 5 * 16, 20 * 16 + 9);
-  e('rush', 7 * 16 + 4, 20 * 16 + 11);
-  e('shield', 9 * 16 + 8, 21 * 16 + 4, { anim: 'roll' });
-  e('shield', 9 * 16 + 8, 23 * 16 + 10, {});
-  e('trooper', 13 * 16, 23 * 16 + 10);
-  for (let i = 0; i < 8; i++) e('scuttler', 17 * 16 + i * 9, 23 * 16 + 6 + (i % 3) * 3);
-  e('rush', 25 * 16, 23 * 16 + 10);
-  e('trooper', 27 * 16 + 8, 21 * 16 + 10, { facing: 'E' });
-  e('trooper', 18 * 16, 23 * 16 + 9, { anim: 'death', frame: 2 });
-  R.air.push({ x: 20 * 16, y: 18 * 16, dir: 0, alt: 24 }, { x: 24 * 16, y: 19 * 16 + 8, dir: 2, alt: 22, frame: 1 });
-  R.bolts.push({ x: 6 * 16, y: 19 * 16, dir: 2 }, { x: 22 * 16, y: 22 * 16, dir: 8, side: 'sep' });
-  R.fx.push({ bm: art.vfx.expM[2], x: 12 * 16, y: 22 * 16 + 4, glow: art.vfx.glowFire }, { bm: art.vfx.shield[0], x: 9 * 16 + 8, y: 23 * 16 });
-  const view = composeScene(art, GRID, R, { ox: 0, oy: 28 * 16 - 270, w: 480, h: 270, seed: 9 });
-  png(view, 'readability-4x.png', 4);
   const s = new Slide('', '');
-  s.img(view, 0, 0, 4);
-  fill(s.bm, 0, 0, 980, 50, '#0c1116', 210);
-  s.text('READABILITY - ACTUAL DEFAULT ZOOM (1080P, S=4). ALL 15 TOWER VARIANTS + 5 DROIDS', 16, 16, { n: 2, color: C.title });
-  addSlide('readability', s, 'Readability check: everything at actual default-zoom size (1 art px = 4 screen px).');
+  s.img(shot1080.bm, 0, 0, 1);
+  addSlide('readability', s, 'Readability: the exact 1080p frame (UI S=4, world SW=2), HUD included.');
 }
 
 // ------------------------------------------------------------ VFX ----------
@@ -405,184 +375,172 @@ png(mockup, 'kamino-mockup-2x.png', 2);
     blit(c, bm, (c.w - bm.w) >> 1, (c.h - bm.h) >> 1);
     return c;
   };
+  const sixteen = (arr) => arr.filter((_, i) => i % (arr.length / 16) === 0);
   let y = 124;
-  s.text('REPUBLIC BOLTS - 16 ANGLES (WITH ADDITIVE PIXEL-RING GLOW)', 40, y, { n: 2, color: C.accent });
-  s.img(strip(art.vfx.boltRep.map((b) => withGlow(b, art.vfx.glowRep)), 0), 40, y + 26, 4);
-  y += 26 + 17 * 4 + 20;
-  s.text('SEPARATIST BOLTS - 16 ANGLES', 40, y, { n: 2, color: C.accent });
-  s.img(strip(art.vfx.boltSep.map((b) => withGlow(b, art.vfx.glowSep)), 0), 40, y + 26, 4);
-  y += 26 + 17 * 4 + 24;
-  s.text('ION ARC (3 FRAMES)', 40, y, { n: 2, color: C.accent });
-  s.img(strip(art.vfx.ionArc.map((b) => withGlow(b, art.vfx.glowIon)), 4), 40, y + 26, 4);
+  s.text('REPUBLIC BOLTS - 16 OF 32 ANGLES (WITH ADDITIVE PIXEL-RING GLOW)', 40, y, { n: 2, color: C.accent });
+  const rb = strip(sixteen(art.vfx.boltRep).map((b) => withGlow(b, art.vfx.glowRep)), 0);
+  s.img(rb, 40, y + 26, 2);
+  y += 26 + rb.h * 2 + 16;
+  s.text('SEPARATIST BOLTS', 40, y, { n: 2, color: C.accent });
+  s.img(strip(sixteen(art.vfx.boltSep).map((b) => withGlow(b, art.vfx.glowSep)), 0), 40, y + 26, 2);
+  y += 26 + rb.h * 2 + 16;
+  s.text('ION ARC (4 FRAMES)', 40, y, { n: 2, color: C.accent });
+  const ia = strip(art.vfx.ionArc.map((b) => withGlow(b, art.vfx.glowIon)), 4);
+  s.img(ia, 40, y + 26, 2);
   s.text('ION BURST', 1300, y, { n: 2, color: C.accent });
-  s.img(strip(art.vfx.ionBurst.map((b) => withGlow(b, art.vfx.glowIon)), 0), 1300, y + 26, 4);
-  y += 26 + 19 * 4 + 24;
-  s.text('MUZZLE FLASHES (BLASTER S/M, ROCKET/FLAK, BACKBLAST)', 40, y, { n: 2, color: C.accent });
-  const flashes = [fromMap(['.C.', 'C#C', '.C.']), fromMap(['..c..', '.cCc.', 'cC#Cc', '.cCc.', '..c..']), art.vfx.muzzleFire, art.vfx.backblast];
-  s.img(strip(flashes.map((b, i) => withGlow(b, i < 2 ? art.vfx.glowRep : art.vfx.glowFire)), 2), 40, y + 26, 4);
-  s.text('IMPACT SPARKS (REP / SEP / ARMOR METAL)', 1000, y, { n: 2, color: C.accent });
-  s.img(strip([...art.vfx.sparksRep, ...art.vfx.sparksSep, ...art.vfx.sparksMetal].map((b) => withGlow(b, art.vfx.glowRep)), 1), 1000, y + 26, 4);
-  y += 26 + 30 * 4 + 24;
-  s.text('SHIELD HIT - HEX BUBBLE RIPPLE (4 FRAMES)', 40, y, { n: 2, color: C.accent });
-  s.img(strip(art.vfx.shield.map((b) => { const c = new Bitmap(b.w + 4, b.h + 4); fill(c, 0, 0, c.w, c.h, dark); blit(c, b, 2, 2); return c; }), 2), 40, y + 26, 4);
-  s.text('HIT FLASH (1-2 FRAMES)', 1000, y, { n: 2, color: C.accent });
+  s.img(strip(art.vfx.ionBurst.map((b) => withGlow(b, art.vfx.glowIon)), 0), 1300, y + 26, 2);
+  y += 26 + ia.h * 2 + 16;
+  s.text('MUZZLE FLASHES (BLASTER S/M, ROCKET/FLAK)', 40, y, { n: 2, color: C.accent });
+  const flashes = [fromMap(MUZZLE_SMALL), fromMap(MUZZLE_MED), art.vfx.muzzleFire, art.vfx.backblast];
+  s.img(strip(flashes.map((b, i) => withGlow(b, i < 2 ? art.vfx.glowRep : art.vfx.glowFire)), 2), 40, y + 26, 2);
+  s.text('IMPACT SPARKS (REP / SEP / ARMOR METAL)', 900, y, { n: 2, color: C.accent });
+  s.img(strip([...art.vfx.sparksRep, ...art.vfx.sparksSep, ...art.vfx.sparksMetal].map((b) => withGlow(b, art.vfx.glowRep)), 1), 900, y + 26, 2);
+  y += 26 + 52 * 2 + 16;
+  s.text('SHIELD HIT - HEX BUBBLE RIPPLE (6 FRAMES)', 40, y, { n: 2, color: C.accent });
+  s.img(strip(art.vfx.shield.map((b) => { const c = new Bitmap(b.w + 4, b.h + 4); fill(c, 0, 0, c.w, c.h, dark); blit(c, b, 2, 2); return c; }), 2), 40, y + 26, 2);
+  s.text('HIT FLASH (1-2 FRAMES)', 1300, y, { n: 2, color: C.accent });
   const tr = art.enemies.trooper.walk[0];
-  s.img(strip([tr, silhouette(tr, '#ffffff'), tr], 3), 1000, y + 26, 4);
+  s.img(strip([tr, silhouette(tr, '#ffffff'), tr], 4), 1300, y + 26, 2);
   addSlide('vfx-1', s, 'Bolts, glows, ion, flashes, sparks, shield ripple, hit flash.');
 }
 {
   const s = new Slide('VFX II', 'explosions S/M/L, smoke, scorch decals, debris, rain');
   let y = 124;
-  const row = (name, frames, n = 4) => {
+  const row = (name, frames, maxW = SW - 80) => {
     s.text(name, 40, y, { n: 2, color: C.accent });
     const st = strip(frames, 2);
-    const c = new Bitmap(st.w + 4, st.h + 4);
-    for (let j = 0; j < c.h; j += 16) for (let i = 0; i < c.w; i += 16) blit(c, GROUND, i, j);
+    const c = tiled(st.w + 4, st.h + 4, GROUND);
     blit(c, st, 2, 2);
+    const n = Math.max(1, Math.min(2, Math.floor(maxW / c.w)));
     s.img(c, 40, y + 26, n);
-    y += 26 + c.h * n + 20;
+    y += 26 + c.h * n + 16;
   };
-  row('EXPLOSION S (ROCKET HIT)', art.vfx.expS);
-  row('EXPLOSION M', art.vfx.expM);
-  row('EXPLOSION L (ARTILLERY / BOSS)', art.vfx.expL, 3);
-  y -= 0;
+  row('EXPLOSION S (ROCKET HIT) - 10 FRAMES', art.vfx.expS);
+  row('EXPLOSION M - 12 FRAMES', art.vfx.expM);
+  row('EXPLOSION L (ARTILLERY / BOSS) - 15 FRAMES', art.vfx.expL);
   const y0 = y;
-  row('SMOKE PUFF (DRIFTS, FADES)', art.vfx.smoke);
+  row('SMOKE PUFF - 8 FRAMES', art.vfx.smoke, 860);
   y = y0;
-  s.text('SCORCH DECALS (POOLED, OLDEST FADES)', 900, y, { n: 2, color: C.accent });
-  const sc = strip(art.vfx.scorch, 4);
-  const c = new Bitmap(sc.w + 8, sc.h + 8);
-  for (let j = 0; j < c.h; j += 16) for (let i = 0; i < c.w; i += 16) blit(c, GROUND, i, j);
+  s.text('SCORCH DECALS', 940, y, { n: 2, color: C.accent });
+  const sc = strip(art.vfx.scorch, 6);
+  const c = tiled(sc.w + 8, sc.h + 8, GROUND);
   blit(c, sc, 4, 4);
-  s.img(c, 900, y + 26, 4);
+  s.img(c, 940, y + 26, 2);
   s.text('DEBRIS + RAIN + SPLASH', 1500, y, { n: 2, color: C.accent });
-  const d = strip([...art.vfx.debris, art.vfx.rain, ...art.vfx.splash], 3);
+  const d = strip([...art.vfx.debris, art.vfx.rain, ...art.vfx.splash], 4);
   const c2 = new Bitmap(d.w + 6, d.h + 6);
   fill(c2, 0, 0, c2.w, c2.h, '#34434a');
   blit(c2, d, 3, 3);
-  s.img(c2, 1500, y + 26, 4);
-  addSlide('vfx-2', s, 'Explosion frame strips (pixel fireball -> breakup -> smoke), smoke puff, scorch decals, debris, rain.');
+  s.img(c2, 1500, y + 26, 2);
+  addSlide('vfx-2', s, 'Explosion frame strips (fireball -> breakup -> smoke), smoke puff, scorch decals, debris, rain.');
 }
 
 // ------------------------------------------------------------ UI -----------
+// iPhone 12 landscape (844x390 CSS @3x = 2532x1170). Shown at exactly half
+// size: every scale on that screen is even, so halving is lossless.
+const iphone = (setup) => frame(844, 390, 3, setup);
 {
-  const ox = 9 * 16, oy = 2 * 16;
-  const scene = composeScene(art, GRID, { ...MOCK, towers: MOCK.towers.filter((t) => t.tx > 12), bolts: [], fx: [] }, { ox, oy, w: VIEW.w, h: VIEW.h, seed: 3 });
-  drawTopHud(scene, art, { speed: 1 });
-  drawBuildBar(scene, art, { selected: 'rocket' });
-  drawPlacement(scene, art, { tx: 22, ty: 10, ox, oy, valid: true, type: 'rocket', range: 56 });
-  png(scene, 'hud-placement-2x.png', 2);
-  const s = new Slide('UI I', 'iPhone 12 landscape view 633x292 (S=4), 2x. Placing a tower');
-  s.img(scene, 40, 124, 2);
+  const { bm, app } = iphone((g) => {
+    g.pick('rocket');
+    const spot = spotsNearPath(g.sim, 'rocket').find((p) => p.d > 40 && p.d < 90 && p.tx > 24 && p.tx < 36 && p.ty > 3 && p.ty < 13);
+    Object.assign(g.placing, { tx: spot.tx, ty: spot.ty, valid: true, touch: true });
+    g.cam.centerOn((spot.tx + 2) * TILE, (spot.ty + 1) * TILE);
+    g.paused = true;
+  });
+  const s = new Slide('UI I', `iPhone 12 landscape (2532x1170): UI S=${app.sc.S}, world SW=${app.sc.SW}, shown at half size`);
+  s.img(half(bm), 40, 124, 1);
   const notes = [
     'TOP-LEFT: LIVES, CREDITS, WAVE X/Y.',
-    'NEXT-WAVE PREVIEW: ICONS + COUNTS, AIR / ARMOR / SHIELD WARNINGS, CALL-EARLY BONUS.',
+    'NEXT-WAVE PREVIEW: ICONS + COUNTS, AIR / ARMOR / SHIELD WARNINGS, START OR CALL-EARLY BONUS.',
     'TOP-RIGHT: PAUSE, 1x 2x 3x, MENU.',
     'BUILD BAR: TOWER + COST, LOCKED SLOTS.',
-    'DRAG GHOST: RANGE CIRCLE, GREEN/RED TILES, CONFIRM / CANCEL. GHOST SITS ABOVE THE FINGER.',
-    'EVERY TAP TARGET IS 33x33 ART PX = 44x44 CSS PX ON THIS PHONE.',
+    'DRAG GHOST: RANGE CIRCLE, GREEN/RED TILES, CONFIRM / CANCEL. THE GHOST SITS ABOVE THE FINGER.',
+    `EVERY TAP TARGET IS >= ${app.ui.T} UI PX = 44 CSS PX ON THIS PHONE.`,
   ];
   let y = 140;
-  for (const n of notes) y += s.lines(wrap(n, 26), 1340, y, { n: 2 }) + 16;
-  s.text('INVALID SPOT', 40, 124 + 292 * 2 + 30, { n: 2, color: C.accent });
-  const bad = new Bitmap(60, 56);
-  for (let j = 0; j < 56; j += 16) for (let i = 0; i < 60; i += 16) blit(bad, K.path, i, j);
-  blit(bad, gridCell(false), 22, 22);
-  const rc = rangeCircle(24, { valid: false });
-  blit(bad, rc, 30 - (rc.w >> 1), 30 - (rc.h >> 1));
-  s.img(bad, 40, 124 + 292 * 2 + 60, 4);
-  s.text('BUTTONS: NORMAL / PRESSED (SQUASH) / ACCENT / GOOD / BAD', 360, 124 + 292 * 2 + 30, { n: 2, color: C.accent });
-  const bts = strip([button(40, 33), button(40, 33, { pressed: true }), button(40, 33, { style: 'accent' }), button(40, 33, { style: 'good' }), button(40, 33, { style: 'bad' })], 4);
-  s.img(bts, 360, 124 + 292 * 2 + 60, 4);
-  addSlide('ui-placement', s, 'HUD with drag-ghost placement at the iPhone 12 view size. Placeholder numbers.');
+  for (const n of notes) y += s.lines(wrap(n, 24), 1340, y, { n: 2 }) + 16;
+  s.text('BUTTONS: NORMAL / PRESSED (SQUASH) / ACCENT / GOOD / BAD', 40, 124 + 585 + 30, { n: 2, color: C.accent });
+  s.img(strip([button(40, 33), button(40, 33, { pressed: true }), button(40, 33, { style: 'accent' }), button(40, 33, { style: 'good' }), button(40, 33, { style: 'bad' })], 4), 40, 124 + 585 + 60, 4);
+  s.text('INVALID SPOT', 1340, 124 + 585 + 30, { n: 2, color: C.accent });
+  const bad = tiled(120, 112, K.path);
+  blit(bad, gridCell(false), 44, 40);
+  const rc = rangeCircle(48, { valid: false });
+  blit(bad, rc, 60 - (rc.w >> 1), 56 - (rc.h >> 1));
+  s.img(bad, 1340, 124 + 585 + 60, 2);
+  addSlide('ui-placement', s, 'HUD with drag-ghost placement, rendered by the game at the iPhone 12 size.');
 }
 {
-  const ox = 9 * 16, oy = 2 * 16;
-  const towers = MOCK.towers.map((t) => (t.tx === 26 && t.ty === 6 ? { ...t, tier: 't2', firing: false } : t));
-  const scene = composeScene(art, GRID, { ...MOCK, towers, bolts: MOCK.bolts.slice(2), fx: MOCK.fx.slice(0, 2) }, { ox, oy, w: VIEW.w, h: VIEW.h, seed: 5 });
-  // selected tower: range circle around the rocket III at (26,6)
-  const rc = rangeCircle(60);
-  blit(scene, rc, 26 * 16 + 8 - ox - (rc.w >> 1), 6 * 16 + 8 - oy - (rc.h >> 1));
-  drawTopHud(scene, art, { speed: 2, lives: 17, flashLives: true });
-  drawBuildBar(scene, art, { selected: null });
-  drawInfoPanel(scene, art, VIEW.w - 186, 42);
-  png(scene, 'hud-info-2x.png', 2);
-  const s = new Slide('UI II', 'tower selected: range circle + info panel, 2x');
-  s.img(scene, 40, 124, 2);
+  const { bm } = iphone((g) => {
+    const t = g.sim.state.towers.find((q) => q.type === 'rocket' && q.tier === 't2') || g.sim.state.towers[0];
+    g.selId = t.id;
+    g.cam.centerOn(t.x + 120, t.y);
+    g.paused = true;
+  });
+  const s = new Slide('UI II', 'tower selected: range circle + info panel (iPhone 12, half size)');
+  s.img(half(bm), 40, 124, 1);
   const notes = [
     'INFO PANEL: DPS, DAMAGE TYPE, HITS AIR, TARGETING MODE (FIRST / LAST / STRONGEST / CLOSEST / AIR PRIORITY).',
-    'NEXT UPGRADE AS A DIFF: GREEN = BETTER, RED = WORSE.',
-    'UPGRADE AND SELL (WITH CURRENT SELL VALUE).',
-    'LIVES FLASH RED AFTER A LEAK.',
+    'NEXT UPGRADE AS A DIFF: GREEN = BETTER, RED = WORSE. ROWS SHRINK ON SHORT SCREENS.',
+    'UPGRADE AND SELL SIDE BY SIDE; SELL ASKS FOR A SECOND TAP.',
+    'TIER 4: BOTH SPECIALIZATIONS SIDE BY SIDE, LOCKED ONCE CHOSEN.',
   ];
   let y = 140;
-  for (const n of notes) y += s.lines(wrap(n, 26), 1340, y, { n: 2 }) + 16;
-  s.text('ICONS', 40, 124 + 292 * 2 + 30, { n: 2, color: C.accent });
-  const ics = Object.keys(ICONS).map((n) => icon(n));
-  const st = strip(ics, 4);
-  const back = new Bitmap(st.w + 8, st.h + 8);
+  for (const n of notes) y += s.lines(wrap(n, 24), 1340, y, { n: 2 }) + 16;
+  s.text('ICONS (2X DETAIL)', 40, 124 + 585 + 30, { n: 2, color: C.accent });
+  const ics = strip(Object.keys(ICONS).map((n) => icon(n)), 6);
+  const back = new Bitmap(ics.w + 12, ics.h + 12);
   fill(back, 0, 0, back.w, back.h, '#222c35');
-  blit(back, st, 4, 4);
-  s.img(back, 40, 124 + 292 * 2 + 60, 4);
-  s.text('DAMAGE NUMBERS (OPTIONAL)', 1340, 124 + 292 * 2 + 30, { n: 2, color: C.accent });
-  const dn = new Bitmap(60, 14);
-  fill(dn, 0, 0, 60, 14, '#34434a');
-  drawText(dn, '12', 2, 3, { color: '#ffffff', font: FONT5, outline: '#101217' });
-  drawText(dn, '36!', 18, 3, { color: '#ffd27a', font: FONT5, outline: '#101217' });
-  drawText(dn, '+24', 38, 3, { color: '#9ef08a', font: FONT5, outline: '#101217' });
-  s.img(dn, 1340, 124 + 292 * 2 + 60, 4);
-  addSlide('ui-info', s, 'Tower info panel and icon set. Placeholder numbers.');
+  blit(back, ics, 6, 6);
+  s.img(back, 40, 124 + 585 + 60, 3);
+  addSlide('ui-info', s, 'Tower info panel and icon set, rendered by the game.');
 }
 
 // ------------------------------------------------------------ icon/emblem --
-function appIcon(size = 48, maskable = false) {
+function appIcon(size = 96, maskable = false) {
   const bm = new Bitmap(size, size);
-  // steel plate with bevel, dark storm-blue field, emblem centered
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
       const edge = Math.min(x, y, size - 1 - x, size - 1 - y);
       let c = '#1c2a36';
       if (!maskable) {
         if (edge === 0) c = '#101217';
-        else if (edge === 1) c = x < y ? '#4f5d63' : (size - 1 - x < size - 1 - y ? '#151c23' : '#7d8d90');
-        else if (edge < 4) c = '#33404a';
+        else if (edge <= 2) c = x < y ? '#4f5d63' : (size - 1 - x < size - 1 - y ? '#151c23' : '#7d8d90');
+        else if (edge < 7) c = '#33404a';
       }
-      if (c === '#1c2a36' && ((x + y) % 2 === 0) && Math.hypot(x - size / 2, y - size / 2) < size * 0.34) c = '#22344a';
+      if (c === '#1c2a36' && (x + y) % 2 === 0 && Math.hypot(x - size / 2, y - size / 2) < size * 0.34) c = '#22344a';
       fill(bm, x, y, 1, 1, c);
     }
   const g = art.vfx.glowRep;
   blitAdd(bm, scale(g, 3), (size - g.w * 3) >> 1, (size - g.h * 3) >> 1);
   const em = art.emblems.republic;
-  blit(bm, em, (size - em.w) >> 1, ((size - em.h) >> 1) + 1);
+  blit(bm, em, (size - em.w) >> 1, ((size - em.h) >> 1) + 2);
   return bm;
 }
 {
-  const s = new Slide('App icon + title emblem', 'concept; final icons exported from this code in Phase 4');
-  const ic = appIcon(48);
-  s.img(ic, 60, 140, 8);
-  s.text('APP ICON 48 ART PX (x8 = 384)', 60, 140 + 384 + 16, { n: 2, color: C.dim });
-  const mk = appIcon(48, true);
-  s.img(mk, 500, 140, 8);
+  const s = new Slide('App icon + title emblem', 'concept at 2x detail; final icons exported from this code in Phase 4');
+  const ic = appIcon(96);
+  s.img(ic, 60, 140, 4);
+  s.text('APP ICON 96 ART PX (x4 = 384)', 60, 140 + 384 + 16, { n: 2, color: C.dim });
+  const mk = appIcon(96, true);
+  s.img(mk, 500, 140, 4);
   s.text('MASKABLE (FULL BLEED, SAFE ZONE)', 500, 140 + 384 + 16, { n: 2, color: C.dim });
-  // maskable safe-zone circle guide
   const guide = new Bitmap(384, 384);
   for (let y = 0; y < 384; y++) for (let x = 0; x < 384; x++) if (Math.abs(Math.hypot(x - 192, y - 192) - 154) < 1) guide.set(x, y, 0x80ffffff);
   blit(s.bm, guide, 500, 140);
-  s.img(ic, 940, 140, 4);
-  s.img(ic, 940 + 220, 140, 2);
-  s.img(ic, 940 + 340, 140, 1);
-  s.text('4x / 2x / 1x', 940, 140 + 200, { n: 2, color: C.dim });
+  s.img(ic, 940, 140, 2);
+  s.img(ic, 940 + 220, 140, 1);
+  s.text('2x / 1x', 940, 140 + 200, { n: 2, color: C.dim });
   const logo1 = logoText('REPUBLIC', 3);
   const logo2 = logoText('FRONTLINE', 3, ['#a8f4ff', '#7cf0ff', '#38b8e0', '#1d6f95']);
   const ty = 680;
-  s.img(art.emblems.republic, 60, ty, 8);
+  s.img(art.emblems.republic, 60, ty, 4);
   s.img(logo1, 260, ty + 10, 2);
   s.img(logo2, 260, ty + 10 + logo1.h * 2 + 6, 2);
   s.text('TITLE LOCKUP: ORIGINAL KITE-SHIELD EMBLEM, BEVELED PIXEL LETTERING FROM THE GAME FONT', 60, ty + 230, { n: 2, color: C.dim });
-  s.img(art.emblems.separatist, 1500, ty, 8);
+  s.img(art.emblems.separatist, 1500, ty, 4);
   s.text('SEPARATIST EMBLEM', 1500, ty + 140, { n: 2, color: C.dim });
-  png(ic, 'icon-concept-8x.png', 8);
-  png(mk, 'icon-concept-maskable-8x.png', 8);
+  png(ic, 'icon-concept-4x.png', 4);
+  png(mk, 'icon-concept-maskable-4x.png', 4);
   addSlide('icon-emblem', s, 'App icon concept (standard + maskable), title lockup and both faction emblems.');
 }
 
@@ -590,7 +548,7 @@ function appIcon(size = 48, maskable = false) {
 const pptx = new pptxgen();
 pptx.defineLayout({ name: 'RF1080', width: SW / 96, height: SH / 96 });
 pptx.layout = 'RF1080';
-pptx.title = 'Republic Frontline - Phase 0 Art Preview';
+pptx.title = 'Republic Frontline - Art Preview (2x detail)';
 for (const sl of slides) {
   const slide = pptx.addSlide();
   slide.background = { color: '0C1116' };

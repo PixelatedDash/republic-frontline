@@ -2,7 +2,8 @@
 // returns sprite refs with the metadata the renderer needs. Also pre-renders
 // each level's ground layer (4 water frames) to canvases.
 
-import { silhouette, toCanvas, fromMap } from '../art/bitmap.js';
+import { silhouette, toCanvas, fromMap, bounds, crop } from '../art/bitmap.js';
+import { composeRifle, composeTurret } from '../art/towers.js';
 import { MUZZLE_SMALL, MUZZLE_SMALL_B } from '../art/sprites/troopers.js';
 import { renderGround } from '../art/tilemap.js';
 import { icon, ICONS, logoText } from '../art/ui.js';
@@ -83,4 +84,12 @@ export function shadowFor(assets, w) {
 
 export function buildGroundLayers(level, tiles, createCanvas) {
   return Array.from({ length: tiles.water.length }, (_, f) => toCanvas(renderGround(level.grid, tiles, f), createCanvas));
+}
+
+// Build-bar icon: the tier-1 tower, cropped to fit a slot (2x detail).
+export function towerIcon(art, type) {
+  const bm = type === 'rifle' ? composeRifle(art.towers.rifle.t1, 'S') : composeTurret(art.towers[type].t1, 6);
+  const b = bounds(bm);
+  const w = Math.min(52, b.w), h = Math.min(40, b.h);
+  return crop(bm, b.x + ((b.w - w) >> 1), b.y + b.h - h, w, h);
 }

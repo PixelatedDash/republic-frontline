@@ -2,7 +2,7 @@
 // an integer world scale W, the UI pass the integer screen scale S. Every
 // sprite comes from the atlas; positions snap to whole art pixels.
 
-import { Bitmap, rgba } from '../art/bitmap.js';
+import { Bitmap, rgba, toCanvas } from '../art/bitmap.js';
 import { FONT7, FONT5, measure as measureText } from '../art/font.js';
 import { panel as panelBm, button as buttonBm } from '../art/ui.js';
 
@@ -20,8 +20,10 @@ export class Renderer {
     this.sc = sc;
     this.canvas.width = sc.dw;
     this.canvas.height = sc.dh;
-    this.canvas.style.width = `${sc.dw / sc.dpr}px`;
-    this.canvas.style.height = `${sc.dh / sc.dpr}px`;
+    if (this.canvas.style) {
+      this.canvas.style.width = `${sc.dw / sc.dpr}px`;
+      this.canvas.style.height = `${sc.dh / sc.dpr}px`;
+    }
     this.ctx.imageSmoothingEnabled = false;
   }
 
@@ -162,6 +164,16 @@ export class Renderer {
       this.cache.set(key, r);
     }
     return r;
+  }
+
+  // Large overlays (bigger than an atlas page) get their own canvas.
+  cachedCanvas(key, make) {
+    let c = this.cache.get(key);
+    if (!c) {
+      c = toCanvas(make(), this.atlas.createCanvas);
+      this.cache.set(key, c);
+    }
+    return c;
   }
 
   panel(x, y, w, h, opts = {}) {

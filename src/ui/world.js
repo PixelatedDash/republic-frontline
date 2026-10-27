@@ -104,7 +104,7 @@ export function drawWorld(v) {
 
   // overlays on the ground: placement grid + ghost tiles + range circles
   if (placing) {
-    if (settings.showGrid) r.spr(r.cached('gridDots', () => gridDots(sim.level.w * TILE, sim.level.h * TILE, TILE)), 0, 0);
+    if (settings.showGrid) r.canvasAt(r.cachedCanvas('gridDots', () => gridDots(sim.level.w * TILE, sim.level.h * TILE, TILE)), 0, 0);
     const n = TOWERS[placing.type].size;
     for (let y = 0; y < n; y++)
       for (let x = 0; x < n; x++) {

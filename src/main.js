@@ -6,10 +6,8 @@ import { Atlas } from './engine/atlas.js';
 import { Renderer } from './engine/renderer.js';
 import { Input } from './engine/input.js';
 import { AudioSys } from './engine/audio.js';
-import { buildAssets } from './engine/assets.js';
+import { buildAssets, towerIcon } from './engine/assets.js';
 import { buildArtAsync } from './art/index.js';
-import { composeRifle, composeTurret } from './art/towers.js';
-import { bounds, crop } from './art/bitmap.js';
 import { UI } from './ui/ui.js';
 import { PerfMonitor } from './ui/debug.js';
 import { GameScreen } from './ui/game-screen.js';
@@ -121,13 +119,7 @@ app.finishLevel = (sim) => {
   }));
 };
 
-// Build-bar icon: the tier-1 tower, cropped to fit a slot.
-app.makeTowerIcon = (type) => {
-  const bm = type === 'rifle' ? composeRifle(app.art.towers.rifle.t1, 'S') : composeTurret(app.art.towers[type].t1, 3);
-  const b = bounds(bm);
-  const w = Math.min(52, b.w), h = Math.min(40, b.h);
-  return crop(bm, b.x + ((b.w - w) >> 1), b.y + b.h - h, w, h);
-};
+app.makeTowerIcon = (type) => towerIcon(app.art, type);
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {

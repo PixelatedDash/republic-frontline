@@ -322,7 +322,7 @@ export class GameScreen {
     this.drawRain(r);
     if (this.fx.lightning > 0) r.rect(0, 0, ui.vw, ui.vh, '#dff4ff', this.fx.lightning * 0.5);
     ui.beginFrame();
-    this.drawHud();
+    if (!this.hideHud) this.drawHud();
     ui.endFrame();
   }
 
