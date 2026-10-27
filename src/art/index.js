@@ -2,8 +2,11 @@
 // the loading bar) and the export tools call the same function in Node, so
 // the decks always show exactly the in-game pixels.
 
-import { buildRifle, buildRocket, buildFlak, TIERS, TIER_NAMES } from './towers.js';
+import { buildRifle, buildRocket, buildFlak, buildRepeater, buildArtillery, buildIon, buildSharpshooter, buildDepot, TIERS, TIER_NAMES } from './towers.js';
 import { buildTrooperDroid, buildRushDroid, buildScuttler, buildShieldDroid, buildStrikeFighter, ENEMY_INFO } from './enemies.js';
+import * as E2 from './enemies.js';
+import { buildTidebreaker, buildFoundry, buildReaper, buildDreadnought, buildWarlord, BOSS_INFO } from './bosses.js';
+import { buildLandTiles } from './tilemap.js';
 import { buildKaminoTiles } from './tilemap.js';
 import { buildVfx, hologram } from './vfx.js';
 import { fromMap, silhouette, mirrorX } from './bitmap.js';
@@ -69,4 +72,22 @@ export async function buildArtAsync(onProgress = () => {}) {
   return art;
 }
 
-export { TIERS, TIER_NAMES, ENEMY_INFO };
+// Phase 2 content (art checkpoint). Kept apart from buildArt() until it is
+// approved and wired into the game.
+export function buildArtPhase2() {
+  const towers = {};
+  for (const [k, fn] of [['repeater', buildRepeater], ['artillery', buildArtillery], ['ion', buildIon], ['sharpshooter', buildSharpshooter], ['depot', buildDepot]]) {
+    towers[k] = {};
+    for (const t of TIERS) towers[k][t] = fn(t);
+  }
+  const enemies = {
+    commando: E2.buildCommando(), tactical: E2.buildTactical(), tank: E2.buildHeavyTank(), carrier: E2.buildCarrier(),
+    shieldwalker: E2.buildShieldWalker(), crawler: E2.buildCrawler(), siege: E2.buildSiegeWalker(),
+    bomber: E2.buildBomber(), repair: E2.buildRepairDrone(),
+  };
+  const bosses = { tidebreaker: buildTidebreaker(), foundry: buildFoundry(), reaper: buildReaper(), dreadnought: buildDreadnought(), warlord: buildWarlord() };
+  const tiles = Object.fromEntries(['geonosis', 'kashyyyk', 'umbara', 'mustafar'].map((p) => [p, buildLandTiles(p)]));
+  return { towers, enemies, bosses, tiles };
+}
+
+export { TIERS, TIER_NAMES, ENEMY_INFO, BOSS_INFO };

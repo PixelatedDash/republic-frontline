@@ -5,8 +5,9 @@
 
 import { Bitmap, blit, fromMap, rgba, fill } from './bitmap.js';
 import { hd } from './rotsprite.js';
-import { KAMINO_LEGEND } from './palettes.js';
+import { KAMINO_LEGEND, PLANET_PALETTES } from './palettes.js';
 import * as K from './sprites/kamino.js';
+import * as PL from './sprites/planets.js';
 
 export const TILE = 32;
 export const WATER_FRAMES = 8;
@@ -109,6 +110,88 @@ export function renderGround(grid, tiles, frame = 0) {
       if (!isPlat(at(x, y - 1)) && at(x, y - 1) !== 'B') { fill(bm, px, py, TILE, 1, dark); fill(bm, px, py + 1, TILE, 1, lip); }
       if (!isPlat(at(x - 1, y)) && at(x - 1, y) !== 'B') fill(bm, px, py, 1, TILE, dark);
       if (!isPlat(at(x + 1, y)) && at(x + 1, y) !== 'B') fill(bm, px + 31, py, 1, TILE, dark);
+    }
+  return bm;
+}
+
+// ---------------------------------------------------------- land planets --
+// Geonosis / Kashyyyk / Umbara / Mustafar share one autotiler. Grid cells:
+// G ground, X rough (unbuildable), P path, H hazard (chasm / ravine /
+// swamp / lava), B bridge (path over hazard).
+export const HAZARD_FRAMES = 8;
+const digitLegend = (pal) => Object.fromEntries(pal.map((c, i) => [String(i + 1), c]));
+
+function hazardFrames(src, lg, { dx = 4, glints = [] } = {}) {
+  const base = hd(fromMap(src, lg), false);
+  for (const [x, y, c] of glints) base.set(x, y, rgba(c));
+  return Array.from({ length: HAZARD_FRAMES }, (_, i) => {
+    const out = new Bitmap(32, 32);
+    const sx = i * dx, sy = i % 2;
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) out.d[y * 32 + x] = base.d[((y + sy) % 32) * 32 + ((x - sx + 64) % 32)];
+    return out;
+  });
+}
+
+export function buildLandTiles(name) {
+  const def = PL[name.toUpperCase().slice(0, 3)] || PL[name.toUpperCase()];
+  const pal = PLANET_PALETTES[name.toUpperCase()];
+  const lg = digitLegend(pal);
+  const ground0 = fromMap(def.ground, lg);
+  const ground = [ground0, ...def.decals.map((d, i) => {
+    const g = ground0.clone();
+    blit(g, hd(fromMap(d, lg), false), i ? 6 : 14, i ? 8 : 16);
+    return g;
+  })];
+  const props = {};
+  for (const [k, m] of Object.entries(def.props || {})) props[k] = hd(fromMap(m, lg));
+  return {
+    name, pal,
+    ground,
+    path: fromMap(def.path, lg),
+    hazard: hazardFrames(def.hazard, lg, def.hazardAnim || {}),
+    cliff: fromMap(def.cliff, lg),
+    rough: hd(fromMap(def.rough, lg)),
+    bridge: def.bridge ? fromMap(def.bridge, lg) : fromMap(def.path, lg),
+    edge: def.edge.map((h) => rgba(h)), rim: rgba(def.rim),
+    props,
+  };
+}
+
+const isLand = (c) => c === 'G' || c === 'P' || c === 'X';
+const pathy = (c) => c === 'P' || c === 'B';
+export function renderLand(grid, tiles, frame = 0) {
+  const H = grid.length, W = grid[0].length;
+  const bm = new Bitmap(W * TILE, H * TILE);
+  const at = (x, y) => (y < 0 || y >= H || x < 0 || x >= W ? 'G' : grid[y][x]);
+  const [eDark, eLight] = tiles.edge;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const c = at(x, y), px = x * TILE, py = y * TILE;
+      if (c === 'H' || c === 'B') {
+        blit(bm, tiles.hazard[frame % HAZARD_FRAMES], px, py);
+        if (c === 'H' && isLand(at(x, y - 1))) blit(bm, tiles.cliff, px, py);
+        if (c === 'H' && at(x, y - 1) === 'B') blit(bm, tiles.cliff, px, py);
+        if (isLand(at(x - 1, y))) fill(bm, px, py, 1, TILE, tiles.rim);
+        if (isLand(at(x + 1, y))) fill(bm, px + 31, py, 1, TILE, tiles.rim);
+        if (c === 'B') {
+          blit(bm, tiles.bridge, px, py);
+          if (pathy(at(x - 1, y)) || pathy(at(x + 1, y))) { fill(bm, px, py, TILE, 2, eLight); fill(bm, px, py + 30, TILE, 2, tiles.rim); }
+          else { fill(bm, px, py, 2, TILE, eLight); fill(bm, px + 30, py, 2, TILE, tiles.rim); }
+        }
+        continue;
+      }
+      const v = (x * 5 + y * 3 + ((x * y) % 3)) % 7 === 0 ? 1 : (x * 7 + y * 11) % 9 === 0 ? 2 : 0;
+      blit(bm, tiles.ground[v], px, py);
+      if (c === 'X') blit(bm, tiles.rough, px, py);
+      if (c === 'P') {
+        blit(bm, tiles.path, px, py);
+        if (!pathy(at(x, y - 1))) { fill(bm, px, py, TILE, 1, eDark); fill(bm, px, py + 1, TILE, 1, eLight); }
+        if (!pathy(at(x, y + 1))) fill(bm, px, py + 31, TILE, 1, eDark);
+        if (!pathy(at(x - 1, y))) fill(bm, px, py, 1, TILE, eDark);
+        if (!pathy(at(x + 1, y))) fill(bm, px + 31, py, 1, TILE, eDark);
+      }
+      // drop shadow onto ground below a hazard edge
+      if (at(x, y - 1) === 'H') fill(bm, px, py, TILE, 2, tiles.rim);
     }
   return bm;
 }
