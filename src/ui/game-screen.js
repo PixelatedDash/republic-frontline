@@ -58,6 +58,7 @@ export class GameScreen {
 
   resize() {
     this.cam.setViewport(this.app.sc);
+    this.icons = null; // slot icon sizes depend on the scale
   }
 
   get s() {
@@ -361,7 +362,9 @@ export class GameScreen {
     const py = top + 20 + (this.floaters.length ? 0 : 0);
     if (pv && s.phase !== 'won' && s.phase !== 'lost') {
       const pw = rw;
-      const ph = 30;
+      let tallest = 0;
+      for (const g of pv.groups) { const set = A.enemies[g.type]; tallest = Math.max(tallest, (set.walk ? set.h : set.size * 0.8) * app.sc.HIR); }
+      const ph = Math.max(30, Math.round(14 + tallest + 2));
       r.panel(L, py, pw, ph, { title: true });
       ui.block('hud:prev', L, py, pw, ph);
       const label = s.phase === 'setup' ? `WAVE ${pv.index + 1}` : s.countdown > 0 ? `NEXT WAVE ${pv.index + 1} IN ${Math.ceil(s.countdown)}` : `NEXT: WAVE ${pv.index + 1}`;
@@ -370,7 +373,8 @@ export class GameScreen {
       for (const g of pv.groups) {
         const set = A.enemies[g.type];
         const ref = set.walk ? set.walk[1] : set.frames[0][0];
-        const w = (set.walk ? set.w : set.size) / 2, hh = (set.walk ? set.h : set.size * 0.8) / 2;
+        const k = app.sc.HIR;
+        const w = (set.walk ? set.w : set.size) * k, hh = (set.walk ? set.h : set.size * 0.8) * k;
         const clipW = Math.min(w, 16);
         r.hi(ref, x - Math.round((w - clipW) / 2), py + ph - 3 - Math.round(hh));
         r.text(`x${g.count}`, x + clipW, py + ph - 9, COLORS.dim, { font: FONT5 });
@@ -495,7 +499,8 @@ export class GameScreen {
       const r = this.app.renderer;
       const key = `slotIcon:${type}`;
       const ref = r.cached(key, () => this.app.makeTowerIcon(type));
-      this.icons[type] = { ref, w: Math.round(ref.w / 2), h: Math.round(ref.h / 2) };
+      const k = this.app.sc.HIR;
+      this.icons[type] = { ref, w: Math.round(ref.w * k), h: Math.round(ref.h * k) };
     }
     return this.icons[type];
   }
@@ -504,12 +509,16 @@ export class GameScreen {
     const app = this.app, r = app.renderer, ui = app.ui, T = ui.T, s = this.s;
     const def = TOWERS[t.type], st = def.tiers[t.tier];
     const nexts = nextTiers(t.tier);
-    const w = 150;
+    const w = 170;
     const x = R - w;
     const rowH = 9;
     const branch = nexts.length > 1;
-    let h = 14 + 3 * rowH + 10 + T + 8 + (nexts.length ? (branch ? 2 * (T + 3) + 12 : 4 * rowH + 12 + T + 3) : 12) + T + 6;
-    h = Math.min(h, maxY - y);
+    const avail = maxY - y;
+    // diff rows shrink on short screens so every button keeps a full tap size
+    const fixed = 14 + 3 * rowH + 2 + T + 6 + T + 8;
+    const diffRows = branch || !nexts.length ? 0 : Math.max(1, Math.min(4, Math.floor((avail - fixed - (rowH + 1) - (T + 4)) / rowH)));
+    let h = fixed + (branch ? rowH + T + 4 : nexts.length ? rowH + 1 + diffRows * rowH + 2 : 12);
+    h = Math.min(h, avail);
     r.panel(x, y, w, h, { title: true });
     ui.block('info:bg', x, y, w, h);
     r.text(st.name.toUpperCase(), x + 6, y + 4, COLORS.accent);
@@ -531,46 +540,51 @@ export class GameScreen {
     r.text(MODE_LABEL[t.mode], x + w / 2, cy + ((T - 7) >> 1), hl ? COLORS.good : COLORS.text, { align: 'center' });
     if (ui.button('info:next', x + w - 6 - T, cy, T, T, { label: '>' })) { setTargeting(this.sim, t.id, modes[(mi + 1) % modes.length]); this.tutorial?.signal('targeting'); }
     cy += T + 6;
-    // upgrades
+    const sv = sellValue(t, s.wavesEnded);
+    const sellLabel = this.sellConfirm > 0 ? `CONFIRM ${sv}` : `SELL ${sv}`;
+    const sell = (bx, bw, by) => {
+      if (ui.button('info:sell', bx, by, bw, T, { label: sellLabel, style: this.sellConfirm > 0 ? 'bad' : 'normal' })) {
+        if (this.sellConfirm > 0) { sell(this.sim, t.id); this.selId = 0; }
+        else this.sellConfirm = 2.5;
+      }
+    };
     if (!nexts.length) {
       r.text('MAX TIER', x + w / 2, cy, COLORS.dim, { align: 'center' });
       cy += 12;
+      sell(x + 6, w - 12, Math.min(cy, y + h - T - 5));
     } else if (branch) {
-      r.text('CHOOSE SPECIALIZATION (LOCKED)', x + 6, cy, COLORS.warn, { font: FONT5 });
-      cy += 9;
-      for (const b of nexts) {
+      r.text('PICK ONE - LOCKED AFTER', x + 6, cy, COLORS.warn);
+      cy += rowH;
+      const bw = Math.floor((w - 15) / 2);
+      nexts.forEach((b, i) => {
         const bs = def.tiers[b];
         const afford = s.credits >= bs.cost;
-        if (ui.button(`info:up:${b}`, x + 6, cy, w - 12, T, { label: `${bs.name.toUpperCase()} ${bs.cost}`, style: afford ? 'accent' : 'normal', disabled: !afford, sub: T >= 28 ? bs.blurb?.toUpperCase().replace(/\.$/, '') : null })) this.doUpgrade(b);
-        cy += T + 3;
-      }
+        if (ui.button(`info:up:${b}`, x + 6 + i * (bw + 3), cy, bw, T, { label: bs.name.toUpperCase(), sub: String(bs.cost), style: afford ? 'accent' : 'normal', disabled: !afford })) this.doUpgrade(b);
+      });
+      cy += T + 4;
+      sell(x + 6, w - 12, Math.min(cy, y + h - T - 5));
     } else {
       const ns = def.tiers[nexts[0]];
       r.text(`NEXT: ${ns.name.toUpperCase()}`, x + 6, cy, COLORS.dim);
       cy += rowH + 1;
-      const diff = (k, a, b, fmt = (v) => String(v)) => {
-        const c = b > a ? COLORS.good : b < a ? COLORS.bad : COLORS.dim;
-        r.text(k, x + 6, cy, COLORS.dim); r.text(fmt(a), x + 60, cy, COLORS.text); r.text('>', x + 88, cy, COLORS.dim); r.text(fmt(b), x + 98, cy, c);
+      const rows = [
+        ['DPS', towerDps(t.type, t.tier), towerDps(t.type, nexts[0]), (v) => v.toFixed(1)],
+        ['RANGE', st.range, ns.range, String],
+        ['SPLASH', st.splash || 0, ns.splash || 0, String],
+        ['AIR', st.air ? 1 : 0, ns.air ? 1 : 0, (v) => (v ? 'YES' : 'NO')],
+      ].filter((d, i) => i < 2 || d[1] !== d[2]).slice(0, diffRows);
+      for (const [k, a, b2, fmt] of rows) {
+        const c = b2 > a ? COLORS.good : b2 < a ? COLORS.bad : COLORS.dim;
+        r.text(k, x + 6, cy, COLORS.dim); r.text(fmt(a), x + 60, cy, COLORS.text); r.text('>', x + 92, cy, COLORS.dim); r.text(fmt(b2), x + 104, cy, c);
         cy += rowH;
-      };
-      diff('DPS', towerDps(t.type, t.tier), towerDps(t.type, nexts[0]), (v) => v.toFixed(1));
-      diff('RANGE', st.range, ns.range);
-      diff('SPLASH', st.splash || 0, ns.splash || 0);
-      if (ns.air !== st.air) diff('AIR', st.air ? 1 : 0, ns.air ? 1 : 0, (v) => (v ? 'YES' : 'NO'));
-      else cy += rowH;
-      cy += 2;
+      }
+      cy = Math.min(cy + 2, y + h - T - 5);
       const cost = upgradeCost(t, nexts[0]);
       const afford = s.credits >= cost;
-      if (ui.button('info:up', x + 6, cy, w - 12, T, { label: `UPGRADE ${cost}`, style: afford ? 'accent' : 'normal', disabled: !afford })) this.doUpgrade(nexts[0]);
-      cy += T + 3;
+      const uw = Math.round((w - 15) * 0.56);
+      if (ui.button('info:up', x + 6, cy, uw, T, { label: `UPGRADE ${cost}`, style: afford ? 'accent' : 'normal', disabled: !afford })) this.doUpgrade(nexts[0]);
+      sell(x + 9 + uw, w - 15 - uw, cy);
     }
-    const sv = sellValue(t, s.wavesEnded);
-    const sy = Math.min(cy, y + h - T - 5);
-    if (ui.button('info:sell', x + 6, sy, w - 12 - T - 3, T, { label: this.sellConfirm > 0 ? `CONFIRM SELL ${sv}` : `SELL ${sv}`, style: this.sellConfirm > 0 ? 'bad' : 'normal' })) {
-      if (this.sellConfirm > 0) { sell(this.sim, t.id); this.selId = 0; }
-      else this.sellConfirm = 2.5;
-    }
-    if (ui.button('info:close', x + w - 6 - T, sy, T, T, { icon: this.app.assets.icons.cross })) this.selId = 0;
   }
 
   drawTutorial(step, x, bottom) {

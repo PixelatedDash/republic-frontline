@@ -111,7 +111,8 @@ export class UI {
     const dy = pressed ? 1 : 0;
     const a = disabled ? 0.45 : 1;
     if (icon) {
-      const iw = icon.hi ? icon.w / icon.hi : icon.w, ih = icon.hi ? icon.h / icon.hi : icon.h;
+      const k = icon.hi ? this.sc.HIR : 1;
+      const iw = icon.w * k, ih = icon.h * k;
       r.spr(icon, x + Math.round((w - iw) / 2), y + Math.round((h - 3 - ih) / 2) + dy, a);
     }
     if (label) {

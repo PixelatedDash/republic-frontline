@@ -26,8 +26,10 @@ class Backdrop {
   }
   draw(r, ui) {
     // world-density pass (2x detail art at the world scale)
-    const sc = this.app.sc, k = sc.SW;
+    const sc = this.app.sc;
     const g = this.ground[Math.floor(this.t * 6) % this.ground.length];
+    // integer scale that still covers the whole screen
+    const k = Math.max(sc.SW, Math.ceil(sc.dw / g.width), Math.ceil(sc.dh / g.height));
     const vw = sc.dw / k, vh = sc.dh / k;
     const span = Math.max(0, g.width - vw), spanY = Math.max(0, g.height - vh);
     const x = -Math.round((Math.sin(this.t * 0.03) * 0.5 + 0.5) * span);
@@ -188,13 +190,14 @@ export class BriefingScreen {
     for (const t of this.types) {
       const set = A.enemies[t];
       const ref = set.walk ? set.walk[0] : set.frames[0][0];
-      const hw = (set.walk ? set.w : set.size) / 2, hh = (set.walk ? set.h : set.size * 0.9) / 2;
+      const k = app.sc.HIR;
+      const hw = (set.walk ? set.w : set.size) * k, hh = (set.walk ? set.h : set.size * 0.9) * k;
       r.hi(ref, ex, ey + 20 - Math.round(hh));
       ex += Math.round(hw) + 6;
     }
-    r.text(this.types.map((t) => ENEMIES[t].name.toUpperCase()).join(', '), x + 8, ey + 24, COLORS.faint);
     // difficulty
     const dy = y + h - 2 * T - 12;
+    if (ey + 24 + 7 < dy - 10) r.text(this.types.map((t) => ENEMIES[t].name.toUpperCase()).join(', '), x + 8, ey + 24, COLORS.faint);
     r.text('DIFFICULTY', x + 8, dy - 9, COLORS.dim);
     const dw = Math.floor((w - 16 - 8) / 3);
     ['padawan', 'jedi', 'master'].forEach((d, i) => {

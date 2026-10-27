@@ -20,6 +20,8 @@ export function computeScale(cssW, cssH, dpr) {
   return {
     dw, dh, dpr, S, vw, vh, SW,
     HI: Math.max(1, Math.round(S / WORLD_DETAIL)),
+    // UI px covered by one 2x-detail art px (exactly 0.5 when S is even)
+    get HIR() { return this.HI / this.S; },
     ox: Math.floor((dw - vw * S) / 2),
     oy: Math.floor((dh - vh * S) / 2),
     // minimum tap target in UI art px: 44 CSS px
