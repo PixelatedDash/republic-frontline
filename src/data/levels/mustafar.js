@@ -14,10 +14,10 @@ export const MUSTAFAR = [
     props: [['rig', 2, 14], ['rig', 44, 16], ['obsidian', 11, 1], ['obsidian', 36, 9], ['vent', 21, 21], ['vent', 30, 2], ['obsidian', 46, 7], ['vent', 8, 22]],
     briefing: ['ADMIRAL TESK: MUSTAFAR. THE LAST SEPARATIST STRONGHOLD.', 'SIEGE WALKERS COST FIVE LIVES EACH IF THEY GET THROUGH.', 'EVERYTHING YOU HAVE LEARNED, YOU WILL NEED HERE.'],
     recipes: [
-      'commando:2 trooper:2', 'siege', 'bomber:2 fighter:1', 'tactical:1 shieldwalker:1 rush:2', 'tank:2 repair:1', 'carrier:2 crawler:2',
-      'siege:1 commando:2', 'bomber:3 fighter:1', 'shieldwalker:2 tactical:2', 'siege:2 repair:1', 'scuttler:3 carrier:2', 'tank:2 bomber:2',
-      'siege:2 shieldwalker:1', 'crawler:3 tactical:2', 'fighter:3 bomber:3', 'siege:2 tank:2', 'carrier:3 repair:2 commando:2',
-      'shieldwalker:2 crawler:2 bomber:2', 'siege:2 tactical:2 tank:2', 'bomber:3 fighter:2 siege:1', 'siege:3 shieldwalker:2 tank:2 bomber:2',
+      'commando:2 trooper:2', 'siege rush:2', 'bomber:2 fighter:1', 'tactical:1 shieldwalker:1 rush:2', 'tank:2 repair:1 trooper:2', 'carrier:2 crawler:2',
+      'siege:1 commando:2 rush:2', 'bomber:3 fighter:1', 'shieldwalker:2 tactical:2 trooper:2', 'siege:2 repair:1 rush:2', 'scuttler:3 carrier:2', 'tank:2 bomber:2 trooper:2',
+      'siege:2 shieldwalker:1 rush:3', 'crawler:3 tactical:2 scuttler:2', 'fighter:3 bomber:3', 'siege:2 tank:2 rush:3', 'carrier:3 repair:2 commando:2',
+      'shieldwalker:2 crawler:2 bomber:2 trooper:3', 'siege:2 tactical:2 tank:2 rush:3', 'bomber:3 fighter:2 siege:1 scuttler:2', 'siege:3 shieldwalker:2 tank:2 bomber:2 rush:3',
     ], spread: { lanes: 2 },
   },
   {
@@ -33,10 +33,10 @@ export const MUSTAFAR = [
     props: [['rig', 30, 1], ['rig', 30, 26], ['obsidian', 46, 6], ['obsidian', 46, 22], ['vent', 22, 18], ['vent', 22, 9], ['obsidian', 2, 12], ['rig', 12, 17]],
     briefing: ['ADMIRAL TESK: THE MINING PLATFORMS FEED TWO ROADS INTO ONE.', 'THE JUNCTION IS YOUR KILL ZONE. EVERYTHING PASSES THROUGH IT.', 'DO NOT LET THE SIEGE GUNS REACH THE WEST GATE.'],
     recipes: [
-      'trooper:3 commando:2', 'tank:1 tactical:1', 'bomber:2 repair:1', 'siege:1 rush:2', 'shieldwalker:2 crawler:1', 'carrier:2 fighter:2',
-      'siege:1 tank:2', 'bomber:3 tactical:1', 'crawler:2 shieldwalker:2', 'siege:2 commando:2', 'fighter:3 repair:2', 'tank:2 tactical:2 carrier:1',
-      'siege:2 bomber:2', 'shieldwalker:2 crawler:2 tactical:1', 'scuttler:3 carrier:3', 'siege:2 tank:2 repair:1', 'bomber:3 fighter:3',
-      'tactical:2 siege:2 shieldwalker:2', 'tank:3 crawler:2 bomber:2', 'siege:3 tactical:2 repair:2', 'bomber:3 siege:2 tank:2', 'siege:3 shieldwalker:2 crawler:2 bomber:2 tactical:2',
+      'trooper:3 commando:2', 'tank:1 tactical:1 rush:2', 'bomber:2 repair:1', 'siege:1 rush:2 trooper:2', 'shieldwalker:2 crawler:1', 'carrier:2 fighter:2 rush:2',
+      'siege:1 tank:2 trooper:2', 'bomber:3 tactical:1', 'crawler:2 shieldwalker:2 rush:2', 'siege:2 commando:2', 'fighter:3 repair:2 scuttler:2', 'tank:2 tactical:2 carrier:1',
+      'siege:2 bomber:2 rush:3', 'shieldwalker:2 crawler:2 tactical:1 trooper:2', 'scuttler:3 carrier:3', 'siege:2 tank:2 repair:1 rush:3', 'bomber:3 fighter:3',
+      'tactical:2 siege:2 shieldwalker:2 trooper:3', 'tank:3 crawler:2 bomber:2 scuttler:2', 'siege:3 tactical:2 repair:2 rush:3', 'bomber:3 siege:2 tank:2 trooper:3', 'siege:3 shieldwalker:2 crawler:2 bomber:2 tactical:2 rush:3',
     ], spread: { paths: 2, lanes: 2 },
   },
   {
@@ -49,11 +49,11 @@ export const MUSTAFAR = [
     props: [['rig', 5, 15], ['rig', 40, 15], ['obsidian', 46, 0], ['obsidian', 0, 27], ['vent', 21, 9], ['vent', 26, 17], ['obsidian', 30, 26], ['vent', 15, 23]],
     briefing: ['ADMIRAL TESK: THE ROAD SPIRALS IN BETWEEN THE LAVA RIVERS.', 'IT IS LONG. MAKE EVERY METRE COST THEM.', 'ONE MORE PUSH AND THE WARLORD ENGINE HAS NOWHERE TO HIDE.'],
     recipes: [
-      'commando:3 tactical:1', 'siege:1 repair:1', 'bomber:2 fighter:2', 'shieldwalker:2 crawler:1', 'tank:2 carrier:1', 'siege:1 tactical:1 commando:2',
-      'bomber:3 repair:1', 'crawler:2 shieldwalker:2', 'siege:2 rush:3', 'tank:2 bomber:2', 'tactical:2 carrier:2 repair:1', 'siege:2 shieldwalker:2',
-      'fighter:3 bomber:3', 'crawler:3 tank:2', 'siege:2 tactical:2 repair:1', 'bomber:3 carrier:2', 'shieldwalker:2 siege:2 crawler:1',
-      'tank:3 bomber:2 tactical:1', 'siege:3 repair:2', 'fighter:3 bomber:3 shieldwalker:1', 'siege:3 tank:2 tactical:2', 'crawler:3 siege:2 bomber:3',
-      'siege:3 shieldwalker:2 tank:2 bomber:2 tactical:2',
+      'commando:3 tactical:1', 'siege:1 repair:1 rush:2', 'bomber:2 fighter:2', 'shieldwalker:2 crawler:1 trooper:2', 'tank:2 carrier:1 rush:2', 'siege:1 tactical:1 commando:2',
+      'bomber:3 repair:1', 'crawler:2 shieldwalker:2 trooper:2', 'siege:2 rush:3', 'tank:2 bomber:2 rush:2', 'tactical:2 carrier:2 repair:1', 'siege:2 shieldwalker:2 scuttler:2',
+      'fighter:3 bomber:3', 'crawler:3 tank:2 rush:3', 'siege:2 tactical:2 repair:1 trooper:2', 'bomber:3 carrier:2', 'shieldwalker:2 siege:2 crawler:1 rush:3',
+      'tank:3 bomber:2 tactical:1 scuttler:2', 'siege:3 repair:2 rush:3', 'fighter:3 bomber:3 shieldwalker:1', 'siege:3 tank:2 tactical:2 trooper:3', 'crawler:3 siege:2 bomber:3 rush:3',
+      'siege:3 shieldwalker:2 tank:2 bomber:2 tactical:2 scuttler:2',
     ], spread: { lanes: 2 },
   },
   {
@@ -69,11 +69,11 @@ export const MUSTAFAR = [
     props: [['rig', 5, 26], ['rig', 36, 0], ['obsidian', 46, 15], ['obsidian', 11, 14], ['vent', 32, 9], ['vent', 16, 20], ['obsidian', 6, 1], ['rig', 42, 13]],
     briefing: ['ADMIRAL TESK: THIS IS IT. THE WARLORD ENGINE IS MARCHING.', 'ARMOR FIRST, THEN SHIELDS, THEN IT GOES BERSERK AND CALLS EVERYTHING IT HAS.', 'STOP IT HERE AND THE WAR IS OVER.'],
     recipes: [
-      'commando:3 tactical:1', 'siege:1 bomber:1', 'shieldwalker:2 crawler:1', 'tank:2 repair:1', 'bomber:3 fighter:2', 'siege:2 tactical:1',
-      'carrier:2 crawler:2', 'shieldwalker:2 siege:1', 'bomber:3 repair:2', 'tank:2 tactical:2', 'siege:2 crawler:2', 'fighter:3 bomber:3',
-      'shieldwalker:2 tank:2', 'siege:2 tactical:2 repair:1', 'carrier:3 bomber:2', 'siege:3 shieldwalker:1', 'tank:3 crawler:2 tactical:1',
-      'bomber:3 fighter:3 repair:1', 'siege:3 tank:2', 'shieldwalker:2 crawler:2 tactical:2', 'siege:3 bomber:3', 'tank:3 shieldwalker:2 tactical:2',
-      'siege:3 crawler:2 bomber:2 repair:2', 'siege:3 tank:2 shieldwalker:2 bomber:3', '@warlord siege:2 tank:2 bomber:2 tactical:1',
+      'commando:3 tactical:1', 'siege:1 bomber:1 scuttler:2 carrier:1', 'shieldwalker:2 crawler:1', 'tank:2 repair:1 trooper:2', 'bomber:3 fighter:2', 'siege:2 tactical:1 scuttler:2',
+      'carrier:2 crawler:2', 'shieldwalker:2 siege:1 trooper:2', 'bomber:3 repair:2', 'tank:2 tactical:2 scuttler:2 carrier:1', 'siege:2 crawler:2 scuttler:2', 'fighter:3 bomber:3',
+      'shieldwalker:2 tank:2 trooper:2', 'siege:2 tactical:2 repair:1 scuttler:3', 'carrier:3 bomber:2', 'siege:3 shieldwalker:1 scuttler:3 carrier:1', 'tank:3 crawler:2 tactical:1 scuttler:2',
+      'bomber:3 fighter:3 repair:1', 'siege:3 tank:2 scuttler:3', 'shieldwalker:2 crawler:2 tactical:2', 'siege:3 bomber:3 trooper:3', 'tank:3 shieldwalker:2 tactical:2 scuttler:3 carrier:1',
+      'siege:3 crawler:2 bomber:2 repair:2 scuttler:2', 'siege:3 tank:2 shieldwalker:2 bomber:3 scuttler:3', '@warlord siege:2 tank:2 bomber:2 tactical:1 scuttler:3 carrier:1',
     ], spread: { paths: 2, lanes: 2 },
   },
 ];

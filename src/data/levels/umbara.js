@@ -22,18 +22,18 @@ export const UMBARA = [
   },
   {
     id: 'umbara-2', planet: 'umbara', index: 2, name: 'Twin Causeways',
-    size: [48, 28], startCredits: 680, towers: ALL,
+    size: [48, 28], startCredits: 760, towers: ALL,
     paths: [
       [[-1, 6], [20, 6], [20, 12], [48, 12]],
       [[-1, 22], [26, 22], [26, 16], [48, 16]],
     ],
-    lanes: [[[-1, 14], [48, 2]], [[-1, 14], [48, 26]]],
+    lanes: [[[-1, 2], [48, 14]], [[-1, 26], [48, 14]]],
     hazards: [[0, 9, 16, 19], [30, 0, 40, 9], [30, 19, 40, 27], [22, 14, 24, 14]],
     rough: [[4, 1, 6, 2], [44, 21, 46, 22], [44, 5, 46, 6], [10, 25, 12, 26]],
     props: [['glowplant', 24, 2], ['glowplant', 24, 25], ['spores', 44, 9], ['tree', 2, 3], ['tree', 2, 25], ['glowplant', 46, 18], ['spores', 18, 26], ['tree', 42, 2]],
     briefing: ['CAPTAIN RAEL: TWO CAUSEWAYS THROUGH THE SWAMP, BOTH LIVE.', 'TACTICAL DROIDS ARE LEADING THEM. EVERYTHING NEAR ONE MOVES FASTER.', 'KILL THE COMMANDERS AND THE COLUMNS SLOW DOWN.'],
     recipes: [
-      'tactical:1 trooper:3', 'shieldwalker:1 commando:2', 'bomber:2 fighter:1', 'tactical:1 rush:3', 'tank:2 repair:1', 'carrier:2 tactical:1',
+      'tactical:1 trooper:3', 'shieldwalker:1 commando:2', 'fighter:2 trooper:2', 'trooper:2 rush:2', 'tank:2 repair:1', 'carrier:2 tactical:1',
       'shieldwalker:2 crawler:1', 'bomber:2 fighter:2', 'tactical:2 commando:3', 'tank:2 shieldwalker:1', 'scuttler:3 tactical:1 carrier:1', 'bomber:2 repair:2',
       'crawler:2 tactical:2', 'tank:2 shieldwalker:2', 'fighter:3 bomber:2', 'tactical:2 rush:3 shieldwalker:1', 'tank:3 crawler:2 repair:1',
       'bomber:3 tactical:2', 'shieldwalker:2 tank:2 tactical:2 fighter:2', 'tactical:2 crawler:2 tank:2 bomber:2 shieldwalker:1',

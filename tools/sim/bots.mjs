@@ -34,41 +34,66 @@ function levelCache(sim) {
   return c;
 }
 
-// Coverage map: number of path samples within [minRange, range] of each tile.
-function coverageMap(sim, type, st, layer) {
+// Per tile: the path samples within [minRange, range] (cached per level,
+// tower type and tier range).
+function sampleMap(sim, type, st, layer) {
   const c = levelCache(sim);
   const key = `${type}:${st.range}:${st.minRange || 0}:${layer}`;
   let m = c.cov.get(key);
   if (m) return m;
   const { w, h } = sim.level;
-  m = new Int16Array(w * h);
+  m = new Array(w * h);
   const r2 = st.range * st.range, m2 = (st.minRange || 0) ** 2;
+  const S = c.samples[layer];
   for (let ty = 0; ty < h; ty++)
     for (let tx = 0; tx < w; tx++) {
       const { x, y } = towerCenter(type, tx, ty);
-      let n = 0;
-      for (const [px, py] of c.samples[layer]) {
-        const d2 = (px - x) ** 2 + (py - y) ** 2;
-        if (d2 <= r2 && d2 >= m2) n++;
+      const list = [];
+      for (let i = 0; i < S.length; i++) {
+        const d2 = (S[i][0] - x) ** 2 + (S[i][1] - y) ** 2;
+        if (d2 <= r2 && d2 >= m2) list.push(i);
       }
-      m[ty * w + tx] = n;
+      m[ty * w + tx] = Int32Array.from(list);
     }
   c.cov.set(key, m);
   return m;
 }
-const coverage = (sim, type, tx, ty, st, layer) => coverageMap(sim, type, st, layer)[ty * sim.level.w + tx];
+
+// How many towers already cover each path sample (per layer), once per call.
+function coveredCounts(sim, layer) {
+  const S = levelCache(sim).samples[layer];
+  const cnt = new Float32Array(S.length);
+  for (const t of sim.state.towers) {
+    const st = TOWERS[t.type].tiers[t.tier];
+    if (!st.rate || !(layer === 'air' ? st.air : st.ground)) continue;
+    for (const i of sampleMap(sim, t.type, st, layer)[t.ty * sim.level.w + t.tx]) cnt[i]++;
+  }
+  return cnt;
+}
+
+// Marginal coverage: covered samples count for less, so new towers extend
+// the line along the route instead of piling onto the first stretch.
+function coverage(sim, type, tx, ty, st, layer, counts = null) {
+  const list = sampleMap(sim, type, st, layer)[ty * sim.level.w + tx];
+  if (!counts) return list.length;
+  let v = 0;
+  for (const i of list) v += 1 / (1 + counts[i]);
+  return v;
+}
 
 const layerOf = (st) => (st.ground ? 'ground' : 'air');
 
-function bestSpot(sim, type, layer) {
+function bestSpot(sim, type, layer, counts = null) {
   const st = TOWERS[type].tiers.t1;
   if (type === 'depot') return depotSpot(sim);
-  const m = coverageMap(sim, type, st, layer);
+  const m = sampleMap(sim, type, st, layer);
   const { w, h } = sim.level;
   let best = null;
   for (let ty = 0; ty < h; ty++)
     for (let tx = 0; tx < w; tx++) {
-      const c = m[ty * w + tx];
+      const list = m[ty * w + tx];
+      if (!list.length || (best && list.length <= best.c * 0.5)) continue;
+      const c = counts ? coverage(sim, type, tx, ty, st, layer, counts) : list.length;
       if (best && c <= best.c) continue;
       if (!canPlace(sim, type, tx, ty).ok) continue;
       best = { tx, ty, c };
@@ -78,7 +103,7 @@ function bestSpot(sim, type, layer) {
 
 // Depots go where they block nothing: the buildable spot farthest from the path.
 function depotSpot(sim) {
-  const m = coverageMap(sim, 'rifle', { range: 160 }, 'ground');
+  const m = sampleMap(sim, 'rifle', { range: 160 }, 'ground').map((l) => l.length);
   const { w, h } = sim.level;
   let best = null;
   for (let ty = 0; ty < h - 1; ty++)
@@ -164,17 +189,17 @@ function needs(sim, threat) {
   const late = boss && wavesLeft(sim) <= 5 ? 1.5 : 1;
   const bossAir = boss === 'dreadnought';
   return {
-    ground: (1 - threat.airShare * 0.8) * (bossAir ? 1 : late) / (1 + layerDps(sim, 'ground') / 350),
-    air: (threat.air ? Math.max(0.25, threat.airShare) * 3 : 0.15) * (bossAir ? late * 1.4 : 1) / (1 + layerDps(sim, 'air') / 120),
+    ground: Math.max(0.7, 1 - threat.airShare * 0.6) * (bossAir ? 1 : late) / (1 + layerDps(sim, 'ground') / 250),
+    air: (threat.air ? Math.max(0.25, threat.airShare) * 1.8 : 0.12) * (bossAir ? late * 1.4 : 1) / (1 + layerDps(sim, 'air') / 90),
   };
 }
 
 // Value of `dps` worth of a tower tier placed at (tx, ty).
-function worth(sim, type, st, dps, tx, ty, threat, need) {
+function worth(sim, type, st, dps, tx, ty, threat, need, counts = null) {
   const eff = typeEff(TOWERS[type].dtype, threat) * splashTargets(st, threat) * (st.stun ? 1.15 : 1) * (st.slow ? 1.1 : 1);
   let v = 0;
-  if (st.ground) v += dps * uptime(coverage(sim, type, tx, ty, st, 'ground')) * need.ground;
-  if (st.air) v += dps * uptime(coverage(sim, type, tx, ty, st, 'air')) * need.air;
+  if (st.ground) v += dps * uptime(coverage(sim, type, tx, ty, st, 'ground', counts?.ground)) * need.ground;
+  if (st.air) v += dps * uptime(coverage(sim, type, tx, ty, st, 'air', counts?.air)) * need.air;
   return v * eff;
 }
 
@@ -185,6 +210,7 @@ export function balancedBot({ upgrades = true } = {}) {
     for (let guard = 0; guard < 4; guard++) {
       const options = [];
       const need = needs(sim, threat);
+      const counts = { ground: coveredCounts(sim, 'ground'), air: coveredCounts(sim, 'air') };
       const depots = s.towers.filter((t) => t.type === 'depot').length;
       // new towers
       for (const type of s.allowedTowers) {
@@ -198,10 +224,10 @@ export function balancedBot({ upgrades = true } = {}) {
         }
         const layer = layerOf(st);
         if (layer === 'air' && !threat.air && !s.towers.length) continue;
-        const spot = bestSpot(sim, type, layer);
+        const spot = bestSpot(sim, type, layer, counts[layer]);
         if (!spot) continue;
-        let value = worth(sim, type, st, towerDps(type, 't1'), spot.tx, spot.ty, threat, need);
-        value /= 1 + 0.3 * s.towers.filter((t) => t.type === type).length; // prefer a mixed defense
+        let value = worth(sim, type, st, towerDps(type, 't1'), spot.tx, spot.ty, threat, need, counts);
+        value /= 1 + 0.2 * s.towers.filter((t) => t.type === type).length; // prefer a mixed defense
         options.push({ kind: 'build', type, spot, cost: st.cost, value });
       }
       // upgrades

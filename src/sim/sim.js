@@ -455,9 +455,9 @@ function kill(sim, e, towerId) {
   ev(sim, { t: 'death', id: e.id, type: e.type, x: e.x, y: e.y, air: e.air, face: e.face, bounty: d.bounty, boss: !!e.boss });
   if (d.split) for (let i = 0; i < d.split.count; i++) spawnExtra(sim, d.split.type, e.wave, e.route, e.dist - 4 - (i >> 1) * 8, (i % 2 ? 7 : -7) + ((i >> 1) - 1) * 3);
   if (d.drops) {
-    // troopers land on the nearest stretch of road, never right at the exit
+    // troopers land on the nearest stretch of road, never in its last third
     const n = nearestOnPaths(sim.level, e.x, e.y);
-    const dist = Math.min(n.dist, sim.level.paths[n.route].len - 200);
+    const dist = Math.min(n.dist, sim.level.paths[n.route].len * 0.66);
     for (let i = 0; i < d.drops.count; i++) spawnExtra(sim, d.drops.type, e.wave, n.route, dist - i * 10, (i - 1) * 7);
     ev(sim, { t: 'drop', x: e.x, y: e.y, count: d.drops.count });
   }

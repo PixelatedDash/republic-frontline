@@ -103,7 +103,7 @@ test('bomber troopers never land right at the exit', () => {
   dealDamage(sim, b, 1e6, 'explosive');
   const tr = sim.state.enemies.filter((e) => e.type === 'trooper');
   assert.equal(tr.length, 3);
-  for (const t of tr) assert.ok(t.dist <= sim.level.paths[t.route].len - 200);
+  for (const t of tr) assert.ok(t.dist <= sim.level.paths[t.route].len * 0.66);
 });
 
 test('Timber Reaper raises its shell below 60% HP', () => {

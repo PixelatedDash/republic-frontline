@@ -99,11 +99,11 @@ Object.assign(TOWERS, {
     dtype: 'piercing',
     role: 'Very long range, slow, piercing. Ground and air.',
     tiers: {
-      t1: { name: 'Sharpshooter Post I', cost: 180, dmg: 40, rate: 0.5, range: 224, ground: true, air: true, proj: 'snipe' },
-      t2: { name: 'Sharpshooter Post II', cost: 150, dmg: 60, rate: 0.55, range: 240, ground: true, air: true, proj: 'snipe' },
-      t3: { name: 'Sharpshooter Post III', cost: 220, dmg: 84, rate: 0.6, range: 256, ground: true, air: true, proj: 'snipe' },
-      t4a: { name: 'Armor Breaker', cost: 340, dmg: 100, rate: 0.6, range: 268, ground: true, air: true, proj: 'snipe', armorBreak: { v: 1.25, t: 4 }, blurb: 'Hits crack armor: every tower deals more for 4 s.' },
-      t4b: { name: 'Rail Marksman', cost: 340, dmg: 120, rate: 0.5, range: 300, ground: true, air: true, proj: 'snipe', pierce: { count: 5, width: 12 }, blurb: 'Shots pierce through a line of droids.' },
+      t1: { name: 'Sharpshooter Post I', cost: 240, dmg: 42, rate: 0.4, range: 180, ground: true, air: true, proj: 'snipe' },
+      t2: { name: 'Sharpshooter Post II', cost: 200, dmg: 60, rate: 0.45, range: 192, ground: true, air: true, proj: 'snipe' },
+      t3: { name: 'Sharpshooter Post III', cost: 290, dmg: 84, rate: 0.5, range: 204, ground: true, air: true, proj: 'snipe' },
+      t4a: { name: 'Armor Breaker', cost: 450, dmg: 100, rate: 0.5, range: 216, ground: true, air: true, proj: 'snipe', armorBreak: { v: 1.25, t: 4 }, blurb: 'Hits crack armor: every tower deals more for 4 s.' },
+      t4b: { name: 'Rail Marksman', cost: 450, dmg: 125, rate: 0.4, range: 240, ground: true, air: true, proj: 'snipe', pierce: { count: 5, width: 12 }, blurb: 'Shots pierce through a line of droids.' },
     },
   },
   depot: {

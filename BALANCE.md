@@ -34,6 +34,8 @@ Each wave is a hand-written recipe (which droids, in what proportions, in what o
 
 Damage types decide most fights (`src/data/rules.js`): Blaster is cheap and fast but halved by armor and shields; Explosive splashes and does 150% to armor; Ion does 250% to shields and stuns; Piercing does 175% to armor at long range but fires slowly. Every planet from Geonosis on mixes armor, shields, air and swarms, so no single tower type covers a level (the spam bots must lose from Geonosis 3 on).
 
+**Sharpshooter is a specialist, not a backbone.** Piercing is the best type against armor and the post reaches air, so it is priced as a premium tower (240 to build) with slow, heavy shots. Its counter is volume: Scuttler swarms, Carriers and infantry escorts waste its shots. Spamming it alone loses every level from Geonosis 3 on (see the report).
+
 ## What each planet tests
 
 - **Kamino** (tutorial planet): placement, upgrades, targeting, the first shields and the first air lane. New towers: Repeater (K2), Ion (K3), Artillery (K4). Boss: Tidebreaker, armored and slow, rewards explosive coverage along the whole route.

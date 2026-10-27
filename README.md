@@ -1,7 +1,7 @@
 # Republic Frontline
 
 Pixel-art tower defense PWA (Republic clone troopers vs. the droid army). Vanilla JS + Canvas 2D, no build step.
-Status: Phase 1 vertical slice (Kamino 1). See `PROGRESS.md`.
+Status: Phase 2 full content (20 levels on 5 planets, 8 towers, 14 droids, 5 bosses). See `PROGRESS.md`.
 
 **Play it:** https://pixelateddash.github.io/republic-frontline/ (GitHub Pages from `main` / root; every push to `main` redeploys).
 
@@ -11,7 +11,7 @@ Status: Phase 1 vertical slice (Kamino 1). See `PROGRESS.md`.
 node tools/serve.mjs
 ```
 
-Open http://localhost:8765. Add `?skip=1` to jump straight into Kamino 1.
+Open http://localhost:8765. Add `?skip=1` to jump straight into Kamino 1, `?skip=geonosis-4` (any level id) to jump into that level, and `?unlock=1` to open every level in the campaign screen.
 
 ### On your iPhone over Wi-Fi (gameplay only, no PWA features)
 
@@ -47,3 +47,11 @@ node tools/art/lint-art.mjs # orphan-pixel check
 ```
 
 Supabase setup, cloud sync and Add to Home Screen instructions arrive in Phase 4.
+
+## Balance tools
+
+```bash
+node tools/sim/run.mjs --level geonosis-3 --difficulty jedi --bot balanced --seeds 5
+```
+
+Bots: `balanced`, `no-upgrades`, `spam-<tower>`. `tools/sim/tune.mjs` finds each level's HP scale, `tools/sim/apply-tune.mjs` writes it into `src/data/balance.js`, and `tools/sim/report.mjs` regenerates `BALANCE_REPORT.md` (see `BALANCE.md` for the design intent).
