@@ -46,9 +46,10 @@
   its mockup / readability / HUD slides are frames from the real game running headless.
 - Docs: CLAUDE.md, DECISIONS.md (Phase 1 + 2x sections), README (local play, phone over Wi-Fi, GitHub Pages steps).
 
-**Not done / blocked**
-- GitHub Pages deploy: this machine has no GitHub CLI, SSH key or stored credentials. `.nojekyll` and README steps
-  are ready; needs Andrew to create the repo (or install `gh` and log in), then push + enable Pages.
+- Deployed: repo https://github.com/PixelatedDash/republic-frontline (public), GitHub Pages from `main` / root, live at
+  https://pixelateddash.github.io/republic-frontline/ (checked: boot → title → briefing → Kamino 1 at 1280x720, no
+  console errors). Pushes go through GitHub Desktop (the command line has no GitHub login). Tags `phase-0`/`phase-1`
+  are local only so far.
 
 **Next:** Phase 2 art checkpoint (remaining 5 towers, 9 droids, 5 bosses, 4 planet tilesets) after approval.
 

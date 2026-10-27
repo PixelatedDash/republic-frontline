@@ -3,6 +3,8 @@
 Pixel-art tower defense PWA (Republic clone troopers vs. the droid army). Vanilla JS + Canvas 2D, no build step.
 Status: Phase 1 vertical slice (Kamino 1). See `PROGRESS.md`.
 
+**Play it:** https://pixelateddash.github.io/republic-frontline/ (GitHub Pages from `main` / root; every push to `main` redeploys).
+
 ## Play locally
 
 ```bash
