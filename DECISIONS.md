@@ -24,3 +24,25 @@ Judgment calls where the spec was silent or ambiguous. One line each, with the r
 - **Build-bar hotkeys: Q–I** (spec asks to pick one scheme). The number row can't be used because 1/2/3 are speed keys. Logged now so Phase 1 follows it.
 - **Phase 0 mockup map** lives in `tools/art/kamino-mock-map.mjs` (art preview only); real level layouts come from `src/data/levels` in Phase 1.
 - **App icon concept:** Republic kite-shield emblem on a beveled storm-blue plate with a pixel-ring glow; maskable variant is full-bleed with the emblem inside the 80% safe zone.
+
+## Phase 1
+- **Pause on hidden tab:** the game auto-pauses when the page is hidden (visibilitychange) so a phone call or app switch never costs lives.
+- **Speed = more 60 Hz steps per frame,** capped at 4 x speed steps per frame; any backlog beyond that is dropped (no spiral).
+- **Wave end** (interest, autosave) = a wave has finished spawning and every droid from it is dead or leaked; early-called waves overlap, each pays when it resolves.
+- **Shield Droid rolls with its shield down**: damage while rolling hits the body and triggers deployment. Counterplay for the tutorial lesson "hit them while they roll".
+- **Tier-4 branches are all available in Phase 1;** the tech tree gating arrives in Phase 3.
+- **All three slice towers are unlocked on Kamino 1;** the unlock schedule across Kamino/Geonosis is set in Phase 2.
+- **Narrow windows:** S is also capped so the UI view is at least 320 px wide (only binds on portrait desktop windows; landscape screens unchanged).
+- **Mid-wave tutorial messages pause the action** ("tactical pause") until handled; building stays possible.
+- **Sell asks for a second tap** (prevents accidental sells on touch). The info panel has no close button: tapping the map deselects.
+- **Dev server:** `tools/serve.mjs` (no-cache headers; `--lan` for phone testing) instead of `npx serve`, so edits always show on reload.
+
+## 2x detail (Andrew's request during Phase 1: "higher pixel density, smoother, across the whole project")
+- **World art is 2x detail:** tiles 32x32, all pixel-valued data doubled (ranges, speeds, splash, radii). Bot results were bit-identical before/after, so balance is unchanged.
+- **Two integer scales:** UI scale S = largest integer with floor(dh/S) >= 260 (spec rule; UI art and fonts stay at this scale for legibility). World scale SW = same rule at 520. 2x sprites inside the UI draw at HI = round(S/2). Spec §4's single S is split; this is the deliberate deviation that delivers the requested density.
+- **Hand-placed at 2x:** troopers (5 facings), sandbag pieces, plates, all droid bodies, 6-frame walk poses (drafted from joint positions with a scratch line tool, then frozen as literal maps), Kamino tiles. **Upscaled from hand-placed 1x parts** (Scale2x + 1px outline thinning + top-left rim light): turret parts and bases, props, icons, emblems, portrait, flyby, death poses. Characters lose detail under upscaling, so they were redrawn.
+- **More frames:** 6-frame walks and deaths, trooper breathing + recoil frames, 4-frame treads, 3-frame thrusters, 8-frame water, 10/12/15-frame explosions, 8-frame smoke, 6-frame shield ripple, 2-frame muzzle flashes.
+- **32 directions** for turret heads, fighters, bolts and projectiles (RotSprite with 4x sampling for 2x sprites, circle culling, cached upscales; whole art build ~0.2 s in Node). Turrets turn toward targets at a fixed visual rate instead of snapping.
+- **Camera:** 120 ms eased zoom between integer scales (spec allows it), pan momentum after a swipe; integer scale at rest.
+- **Damage numbers draw in the UI layer** so they stay legible at any world zoom.
+- **Deck export at 2x:** sprite strips at 2x (same physical size as 4x of the old art); mockup / readability / HUD slides are frames from the real GameScreen running headless (tools/art/headless.mjs); the iPhone frames are shown at exactly half size (lossless because all scales on that screen are even).

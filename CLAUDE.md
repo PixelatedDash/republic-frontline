@@ -19,8 +19,19 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
   - `font.js` pixel fonts (FONT7 UI, FONT5 damage numbers)
   - `sprites/*.js` hand-placed pixel maps; `towers.js`, `enemies.js`, `tilemap.js`, `vfx.js`, `ui.js` builders
   - `index.js` `buildArt()` — the single entry point the game and the tools call
-- `tools/` — Node-only dev tools (`export-art.mjs`, `art/*`). Later: sim, bench, precache, vendor, icons.
-- Later phases add `src/engine`, `src/sim` (pure, no DOM), `src/fx`, `src/ui`, `src/data`, `src/save`, `tests/`.
+- `src/engine/` — scaling (UI S + world SW), camera (eased integer zoom, momentum), input, atlas, renderer, audio (synth SFX + music sequencer), assets, pool, rng
+- `src/sim/` — pure deterministic simulation (no DOM, no Math.random). State is plain JSON with ids; `sim.events` feed fx/audio/UI
+- `src/fx/` — pooled particles/decals/corpses driven by sim events; dynamic quality
+- `src/ui/` — screens (boot/title/briefing/result), game screen, world draw, HUD widgets (immediate mode), tutorial, settings, debug
+- `src/data/` — towers, enemies, rules (damage table, difficulty, economy), levels, music
+- `src/save/` — schema (versioned, migrations, merge) + IndexedDB storage
+- `tools/` — Node-only: `export-art.mjs` (+ `art/` helpers incl. headless game), `sim/run.mjs` + `sim/bots.mjs`, `serve.mjs`
+- `tests/` — `node --test` suites
+
+## Scale (2x detail)
+- World art is 2x detail: TILE = 32 art px, data in art px. UI art/fonts are 1x at UI scale S; world scale SW = floor(dh/520).
+- 2x-detail sprites shown inside the UI go through `renderer.hi()` (refs flagged `hi: 2` do it automatically); size them with `sc.HIR`.
+- Never put a sprite larger than 1024 px in the atlas; use `renderer.cachedCanvas()` for big overlays.
 
 ## Art rules (spec §4)
 - Characters, towers, bosses, tiles, props, icons, emblems: **hand-placed pixel maps** (strings of legend keys).
@@ -28,11 +39,18 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
   VFX (fireballs, smoke, glows, bolts) may be procedural but must stay in art pixels, palette colors, ordered dithering.
 - Environments muted; only energy is saturated (Republic blue/cyan, Separatist red/orange, ion white-blue, droid shields violet).
 - 1px dark outlines, 3–4 shade ramps, top-left light, no orphan pixels (`node tools/art/lint-art.mjs` must pass).
-- Never rotate sprites at draw time. Turret heads: 16 RotSprite directions. Troopers: 5 authored facings + mirrors.
+- Never rotate sprites at draw time. Turret heads, fighters, bolts: 32 RotSprite directions. Troopers: 5 authored facings + mirrors.
 - Unit stripes use keys `s/S/Z`, swapped with `stripeSwap(bm, name)`.
+
+## Sim rules
+- Everything in `src/sim` must stay deterministic: gameplay randomness only via `src/engine/rng.js` on `state.rng`.
+- After changing sim/data, run the tests and the bots (`npm run sim -- --seeds 3`) and note balance changes in BALANCE.md (Phase 2).
 
 ## Commands
 - `npm install` — dev tools only (`@napi-rs/canvas`, `pptxgenjs`)
 - `node tools/export-art.mjs` — render every sprite strip + slides to `art-preview/`, build `art-preview.pptx`
 - `node tools/art/lint-art.mjs` — orphan-pixel check on every composed tower/enemy frame
+- `node tools/serve.mjs [port] [--lan]` — no-cache dev server (`--lan` to test on a phone over Wi-Fi; no service worker over http)
+- `npm test` — unit tests; `node tools/sim/run.mjs --level kamino-1 --difficulty jedi --bot balanced --seeds 5` — headless bots
+- `?skip=1` on the URL jumps straight into Kamino 1 (dev shortcut)
 - After any art export: open the PNGs in `art-preview/` and critique them against the art rules before presenting.

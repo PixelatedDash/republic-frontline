@@ -1,14 +1,47 @@
 # Republic Frontline
 
-Pixel-art tower defense PWA (Republic clone troopers vs. the droid army). Work in progress — see `PROGRESS.md`.
+Pixel-art tower defense PWA (Republic clone troopers vs. the droid army). Vanilla JS + Canvas 2D, no build step.
+Status: Phase 1 vertical slice (Kamino 1). See `PROGRESS.md`.
 
-Phase 0 art preview: open `art-preview.pptx`, or the PNGs in `art-preview/slides/` (the PNGs are the pixel-exact source of truth).
-
-Regenerate it:
+## Play locally
 
 ```bash
-npm install
-node tools/export-art.mjs
+node tools/serve.mjs
 ```
 
-Full deploy and Supabase setup instructions arrive in Phase 4.
+Open http://localhost:8765. Add `?skip=1` to jump straight into Kamino 1.
+
+### On your iPhone over Wi-Fi (gameplay only, no PWA features)
+
+```bash
+node tools/serve.mjs 8765 --lan
+```
+
+It prints `phone: http://<your-computer-ip>:8765`. Open that in Safari on the same Wi-Fi.
+
+## Deploy to GitHub Pages
+
+The game is static files served from the repository root (all paths are relative, so the `/<repo>/` subpath works).
+
+1. Create an empty repository on github.com (for example `republic-frontline`).
+2. Push this folder to it:
+   ```bash
+   git remote add origin https://github.com/<you>/republic-frontline.git
+   git push -u origin main --tags
+   ```
+3. On GitHub: Settings → Pages → Build and deployment → Source: **Deploy from a branch**, Branch: **main**, folder **/ (root)**. Save.
+4. After a minute the game is live at `https://<you>.github.io/republic-frontline/`.
+
+(`.nojekyll` is included so GitHub serves every file as-is.)
+
+## Developer tools
+
+```bash
+npm install                 # dev tools only (@napi-rs/canvas, pptxgenjs)
+npm test                    # unit tests
+node tools/sim/run.mjs --level kamino-1 --difficulty jedi --bot balanced --seeds 5
+node tools/export-art.mjs   # art deck -> art-preview.pptx + art-preview/*.png
+node tools/art/lint-art.mjs # orphan-pixel check
+```
+
+Supabase setup, cloud sync and Add to Home Screen instructions arrive in Phase 4.
