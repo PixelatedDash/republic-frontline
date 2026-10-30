@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@napi-rs/canvas": "1.0.9",
+    "@supabase/supabase-js": "2.117.3",
     "pptxgenjs": "4.0.1"
   }
 }

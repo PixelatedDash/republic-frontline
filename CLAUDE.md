@@ -9,7 +9,8 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
   "Not verified, needs Andrew", then wait for "approved".
 - Log every judgment call the spec doesn't settle in `DECISIONS.md` (one line + reason).
 - Update `PROGRESS.md` at the end of each session. Commit at milestones; tag `phase-N` at the end of a phase.
-- Pin dependencies to exact versions (devDependencies only; the game ships none).
+- Pin dependencies to exact versions (devDependencies only; the game ships none except `vendor/supabase.js`).
+- **Before every commit that adds, removes or changes game files, run `node tools/build-precache.mjs`** (rewrites the file list + version in `sw.js`; a stale list breaks offline play and the update toast).
 
 ## Layout
 - `src/art/` — all art, shared by the game and Node tools. Pure JS: no DOM, no canvas in builders.
@@ -25,7 +26,8 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 - `src/fx/` — pooled particles/decals/corpses driven by sim events; dynamic quality
 - `src/ui/` — screens (boot/title/briefing/result), meta screens (`meta-screens.js`: galaxy + planet view, tech terminal, medals + stats, archives, ending), game screen, world draw, HUD widgets (immediate mode), tutorial, settings, debug
 - `src/data/` — towers, enemies (incl. bosses), rules (damage table, difficulty, economy), balance (per-level hp scale), meta (tech tree, Heroic sets, achievements, archive), levels (one file per planet; waves are recipes composed by `levels/waves.js`), music
-- `src/save/` — schema (versioned, migrations, merge) + IndexedDB storage
+- `src/save/` — schema (versioned, migrations, merge) + IndexedDB storage + `cloud.js` (Supabase sync); `src/config.js` holds the Supabase URL / publishable key / login email domain
+- PWA: `manifest.webmanifest`, `sw.js` (generated precache block), `icons/` (from `tools/export-icons.mjs`), `supabase/schema.sql`
 - `tools/` — Node-only: `export-art.mjs` (+ `art/` helpers incl. headless game), `sim/run.mjs` + `sim/bots.mjs`, `serve.mjs`
 - `tests/` — `node --test` suites
 

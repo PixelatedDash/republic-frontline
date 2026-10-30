@@ -26,6 +26,7 @@ import { Slide, C, SW, SH, wrap } from './art/slide.mjs';
 import { headlessApp, startGame, advance, spotsNearPath } from './art/headless.mjs';
 import { build, startWave } from '../src/sim/sim.js';
 import { TILE } from '../src/data/levels/index.js';
+import { appIcon as sharedAppIcon } from '../src/art/icon.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'art-preview');
@@ -496,26 +497,7 @@ const iphone = (setup) => frame(844, 390, 3, setup);
 }
 
 // ------------------------------------------------------------ icon/emblem --
-function appIcon(size = 96, maskable = false) {
-  const bm = new Bitmap(size, size);
-  for (let y = 0; y < size; y++)
-    for (let x = 0; x < size; x++) {
-      const edge = Math.min(x, y, size - 1 - x, size - 1 - y);
-      let c = '#1c2a36';
-      if (!maskable) {
-        if (edge === 0) c = '#101217';
-        else if (edge <= 2) c = x < y ? '#4f5d63' : (size - 1 - x < size - 1 - y ? '#151c23' : '#7d8d90');
-        else if (edge < 7) c = '#33404a';
-      }
-      if (c === '#1c2a36' && (x + y) % 2 === 0 && Math.hypot(x - size / 2, y - size / 2) < size * 0.34) c = '#22344a';
-      fill(bm, x, y, 1, 1, c);
-    }
-  const g = art.vfx.glowRep;
-  blitAdd(bm, scale(g, 3), (size - g.w * 3) >> 1, (size - g.h * 3) >> 1);
-  const em = art.emblems.republic;
-  blit(bm, em, (size - em.w) >> 1, ((size - em.h) >> 1) + 2);
-  return bm;
-}
+const appIcon = (size, maskable) => sharedAppIcon(art, size, maskable);
 {
   const s = new Slide('App icon + title emblem', 'concept at 2x detail; final icons exported from this code in Phase 4');
   const ic = appIcon(96);

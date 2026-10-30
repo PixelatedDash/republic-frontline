@@ -7,13 +7,17 @@ const DB = 'republic-frontline';
 const STORE = 'kv';
 const KEY = 'save';
 
-function openDb() {
+// IndexedDB can stall (a pending delete, a stuck upgrade in another tab);
+// boot must never wait on it, so opening times out to the fallback.
+function openDb(timeoutMs = 3000) {
   return new Promise((resolve, reject) => {
     if (!('indexedDB' in globalThis)) return reject(new Error('no indexedDB'));
+    const timer = setTimeout(() => reject(new Error('indexedDB open timed out')), timeoutMs);
     const req = indexedDB.open(DB, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { clearTimeout(timer); resolve(req.result); };
+    req.onerror = () => { clearTimeout(timer); reject(req.error); };
+    req.onblocked = () => { clearTimeout(timer); reject(new Error('indexedDB blocked')); };
   });
 }
 
@@ -84,6 +88,7 @@ export class Storage {
   // Debounced save; flush() writes immediately (visibilitychange -> hidden).
   save(doc, delay = 400) {
     doc.updatedAt = Date.now();
+    this.onSave?.();
     this.pending = doc;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.flush(), delay);

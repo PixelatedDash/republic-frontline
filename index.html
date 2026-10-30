@@ -7,6 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0c1116">
+<meta name="apple-mobile-web-app-title" content="Frontline">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Republic Frontline</title>
 <style>
   html, body {
@@ -35,6 +39,15 @@
   }
   @keyframes turn { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
   @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+  /* login form overlay (account screen) */
+  #login { display: none; position: fixed; z-index: 5; flex-direction: column; gap: 8px; }
+  #login input, #login button {
+    font: 600 16px/1.2 ui-monospace, Menlo, monospace; letter-spacing: 1px; padding: 9px 10px; border-radius: 0;
+    border: 2px solid #101217; background: #151c23; color: #e6ece9; outline: none;
+    -webkit-user-select: text; user-select: text; touch-action: manipulation; min-height: 44px; box-sizing: border-box;
+  }
+  #login input:focus { border-color: #38b8e0; }
+  #login button { background: #38b8e0; color: #0c1116; cursor: pointer; }
 </style>
 </head>
 <body>

@@ -123,3 +123,25 @@ Andrew asked me to keep going through the remaining phases while away ("do all w
 - Feel of the galaxy zoom, cruiser flight and iris transition at full frame rate on iPhone (the browser pane throttles animation in the background, so I checked end states).
 - Whether the tech stat bonuses make later levels too easy once the tree is full (the bots measure the base game only).
 - Heroic difficulty: the balanced bot does not win Jedi Master anywhere, so Heroic replays are untested for winnability.
+
+## 2026-10-29 — Phase 4 (account, sync, PWA) — complete, STOP for review
+
+**Done**
+- Supabase cloud sync (`src/save/cloud.js`): login (username -> `username@republic-frontline.invalid`, or a full email), persistent session, download + merge on launch and login, uploads after levels / tech changes / on hide / every 60 s when dirty, offline-safe. Sync indicator on the title screen, in Settings and on the Account screen.
+- Account screen with a native username/password form over the canvas; no sign-up anywhere.
+- `supabase/schema.sql`: `saves` table, RLS on, select/insert/update own row only, nothing for `anon`.
+- `src/config.js` (empty URL/key = local-only), `vendor/supabase.js` (supabase-js 2.117.3 UMD, pinned).
+- PWA: `manifest.webmanifest`, iOS head tags, icons exported from the art code (`tools/export-icons.mjs`), `sw.js` (cache-first game, network-only Supabase, versioned cache, update toast), `tools/build-precache.mjs`.
+- IndexedDB open timeout -> localStorage fallback (boot can no longer hang on a stuck database).
+- Full README: GitHub Pages deploy, Supabase setup step by step, password resets, free-tier pausing, Add to Home Screen.
+
+**Verified (how)**
+- `npm test`: 64 tests, incl. `tests/cloud.test.mjs` (login mapping; pull merges cloud into local and uploads the result; first login uploads local progress; network errors keep the local save and report OFFLINE; not-configured stays local) and `tests/pwa.test.mjs` (every game file precached and every precached file exists, manifest fields + icon sizes, iOS tags, no service-role key).
+- Desktop Chromium (browser pane, `?sw=1`): the service worker installs and caches 76 files; with the dev server stopped the game still boots into Geonosis 2 (served from cache); after changing a file and rebuilding the precache, the "UPDATE AVAILABLE - TAP TO RELOAD" toast appeared, tapping it activated the new worker, deleted the old cache and reloaded.
+- Account screen: "not set up" and login-form states render; the form only shows on that screen.
+- Supabase email format: checked against the Auth server source (see DECISIONS).
+
+**Not verified, needs Andrew**
+- Login and sync against a real Supabase project: no project or keys were provided, so it is unverified end to end (only against a fake client in tests). Follow README "Cloud sync with Supabase", then log in on phone and desktop.
+- PWA install from Safari, launch without browser chrome, airplane mode (needs the HTTPS deploy on a real iPhone).
+- Push from GitHub Desktop (commits and tags `phase-0`..`phase-4` are local).

@@ -34,7 +34,8 @@ export function drawSettings(ui, app) {
   tog('showGrid', 'GRID', 1, 1);
   tog('debug', 'DEBUG', 0, 2);
   r.text('CLOUD SYNC:', x + 8 + half + 4, cy + 2 * (T + 4) + ((T - 7) >> 1) - 5, COLORS.dim);
-  r.text('NOT LOGGED IN', x + 8 + half + 4, cy + 2 * (T + 4) + ((T - 7) >> 1) + 4, COLORS.warn);
+  const st = app.cloud?.state || 'off';
+  r.text(app.cloud ? app.cloud.label(true) : 'LOCAL ONLY', x + 8 + half + 4, cy + 2 * (T + 4) + ((T - 7) >> 1) + 4, st === 'synced' ? COLORS.good : COLORS.warn);
   cy += 3 * (T + 4) + 4;
   const done = ui.button('set:close', x + 8, Math.min(cy, y + h - T - 6), sw, T, { label: 'DONE', style: 'accent' });
   if (changed) app.applySettings();

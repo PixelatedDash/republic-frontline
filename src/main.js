@@ -17,6 +17,9 @@ import { planetFrames, cruiser, nebula } from './art/galaxy.js';
 import { medal } from './art/medals.js';
 import { mirrorX, toCanvas } from './art/bitmap.js';
 import { ACHIEVEMENTS, awardAchievements } from './data/meta.js';
+import { Cloud } from './save/cloud.js';
+import { AccountScreen } from './ui/account.js';
+import { COLORS } from './ui/ui.js';
 import { Storage } from './save/storage.js';
 import { snapshot } from './sim/sim.js';
 import { starsFor } from './save/schema.js';
@@ -67,6 +70,8 @@ app.input.onFirstGesture(() => app.audio.unlock());
 
 app.setScreen = (s) => {
   app.screen = s;
+  // the login form is a DOM overlay: only the account screen shows it
+  if (!(s instanceof AccountScreen)) { const f = document.getElementById('login'); if (f) f.style.display = 'none'; }
   s.resize?.();
 };
 
@@ -81,7 +86,20 @@ app.toGalaxy = (planet = null) => app.setScreen(new GalaxyScreen(app, { planet }
 app.toTech = () => app.setScreen(new TechScreen(app));
 app.toMedals = () => app.setScreen(new MedalsScreen(app));
 app.toArchives = () => app.setScreen(new ArchivesScreen(app));
-app.saveProgress = () => app.storage.save(app.save);
+app.saveProgress = () => {
+  app.storage.save(app.save);
+  app.cloud.changed();
+};
+app.toAccount = () => app.go(() => app.setScreen(new AccountScreen(app)));
+app.syncStatus = () => app.cloud.label();
+// Cloud merge result replaces the save in place of the local one.
+app.replaceSave = (doc) => {
+  app.save = doc;
+  app.storage.save(doc);
+  app.applySettings();
+};
+app.cloud = new Cloud(app);
+app.storage.onSave = () => { app.cloud.dirty = true; };
 
 // Screen transitions: a pixel iris closes over the old screen, the switch
 // happens while fully covered, then it opens on the new one.
@@ -199,6 +217,7 @@ app.finishLevel = (sim) => {
     kills: s.stats.killsTotal, leaked: s.stats.leaked, credits: s.stats.creditsEarned, seconds: s.time,
     wave: s.waveIndex, totalWaves: s.totalWaves, leakedTypes: s.stats.leakedTypes, medals,
   }));
+  app.cloud.changed(true);
   app.go(() => (firstFinale ? app.setScreen(new EndingScreen(app, result)) : result()));
 };
 
@@ -207,10 +226,54 @@ app.makeTowerIcon = (type) => towerIcon(app.art, type);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     app.storage.flush();
+    if (app.cloud.dirty) app.cloud.changed(true);
     if (app.screen instanceof GameScreen && app.screen.s.phase === 'running') app.screen.paused = true;
     else app.storage.flush();
   }
 });
+
+// ------------------------------------------------------- service worker ---
+// Registered on HTTPS (GitHub Pages) or with ?sw=1; the no-cache dev server
+// stays SW-free. A waiting worker shows the update toast; tapping it
+// activates the new version and reloads.
+app.updateReady = null;
+function setupServiceWorker() {
+  const q = new URLSearchParams(location.search);
+  if (!('serviceWorker' in navigator) || (location.protocol !== 'https:' && !q.has('sw'))) return;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloading) { reloading = true; location.reload(); } });
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    const watch = (w) => w && w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) app.updateReady = w; });
+    if (reg.waiting && navigator.serviceWorker.controller) app.updateReady = reg.waiting;
+    reg.addEventListener('updatefound', () => watch(reg.installing));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+  }).catch((e) => console.warn('service worker', e));
+}
+setupServiceWorker();
+
+function toastRect() {
+  const ui = app.ui, w = Math.min(250, ui.vw - 16), h = ui.T;
+  return { x: (ui.vw - w) >> 1, y: ui.vh - h - 8 - ui.ins.bottom - (app.screen instanceof GameScreen ? ui.T + 18 : 0), w, h };
+}
+// Taps on the toast are taken before the screen sees them.
+function toastInput(events) {
+  if (!app.updateReady) return events;
+  const t = toastRect();
+  return events.filter((e) => {
+    if (e.type !== 'up' && e.type !== 'down') return true;
+    const p = app.ui.toUI(e.x, e.y);
+    const hit = p.x >= t.x && p.y >= t.y && p.x < t.x + t.w && p.y < t.y + t.h;
+    if (hit && e.type === 'up') { app.storage.flush(); app.updateReady.postMessage('skipWaiting'); app.updateReady = null; }
+    return !hit;
+  });
+}
+function drawToast() {
+  if (!app.updateReady) return;
+  const r = app.renderer, t = toastRect();
+  r.ui();
+  r.button(t.x, t.y, t.w, t.h, { style: 'accent' });
+  r.text('UPDATE AVAILABLE - TAP TO RELOAD', t.x + t.w / 2, t.y + ((t.h - 3 - 7) >> 1), COLORS.dark, { align: 'center', shadow: null });
+}
 
 // ---------------------------------------------------------------- loop ----
 let last = performance.now();
@@ -224,9 +287,11 @@ function frame(t) {
   try {
     if (app.screen instanceof GameScreen && app.save) app.save.stats.playSeconds += dtMs / 1000;
     if (app.trans) events = [];
+    events = toastInput(events);
     app.screen.update(dtMs / 1000, events);
     app.screen.render();
     if (app.trans) drawTransition(dtMs / 1000);
+    drawToast();
   } catch (e) {
     // keep the loop alive; report each distinct error once
     const key = String(e && e.stack).slice(0, 200);
@@ -240,6 +305,7 @@ async function boot() {
   requestAnimationFrame(frame);
   await app.storage.init();
   app.save = await app.storage.load();
+  app.cloud.init(); // download + merge in the background; never blocks play
   app.art = await buildArtAsync((p) => { bootScreen.progress = p * 0.9; });
   await new Promise((r) => setTimeout(r, 0));
   app.assets = buildAssets(app.art, app.atlas);
