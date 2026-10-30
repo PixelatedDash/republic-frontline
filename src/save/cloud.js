@@ -24,8 +24,10 @@ function loadScript(src) {
 }
 
 export class Cloud {
-  constructor(app) {
+  constructor(app, { url = SUPABASE_URL, key = SUPABASE_KEY } = {}) {
     this.app = app;
+    this.url = url;
+    this.key = key;
     this.client = null;
     this.user = null;
     this.state = this.configured ? 'offline' : 'off'; // off | out | syncing | synced | offline
@@ -34,7 +36,7 @@ export class Cloud {
     this.error = '';
   }
   get configured() {
-    return !!(SUPABASE_URL && SUPABASE_KEY);
+    return !!(this.url && this.key);
   }
   // Short label for the main menu and Settings.
   label(short = false) {
@@ -46,7 +48,7 @@ export class Cloud {
     if (!this.configured) return;
     try {
       await loadScript('./vendor/supabase.js');
-      this.client = globalThis.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'republic-frontline-auth' } });
+      this.client = globalThis.supabase.createClient(this.url, this.key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'republic-frontline-auth' } });
       const { data } = await this.client.auth.getSession();
       this.user = data.session?.user || null;
       this.state = this.user ? 'syncing' : 'out';

@@ -66,7 +66,7 @@ test('cloud: first login with no row uploads local progress; errors leave the lo
 });
 
 test('cloud: not configured = local-only, no network', async () => {
-  const c = new Cloud(appWith(emptySave()));
+  const c = new Cloud(appWith(emptySave()), { url: '', key: '' });
   assert.equal(c.configured, false);
   assert.equal(c.state, 'off');
   await c.push(); // no user, no client: nothing happens

@@ -125,3 +125,8 @@ Judgment calls where the spec was silent or ambiguous. One line each, with the r
 - **Dynamic quality recovery fix:** quality could drop but never recover at a vsync-locked 60 fps (recovery required a < 13 ms frame interval, impossible at 16.7 ms). The monitor now also gets the measured work time per frame (update + render) and recovers after 4 s of < 9 ms work. Drops still use the frame interval (missed frames).
 - **Integer scales in fitted sprites:** UI sprite fitting picks only whole device-pixel scales (HI x n, or HI / 2^k while that stays an integer) and clips when nothing fits, instead of drawing at half a device pixel. The galaxy zoom keeps its 0.45 s non-integer ease (like the camera).
 - **QA sweep:** `tools/art/qa-sweep.mjs` plays every level through the real GameScreen on a headless canvas with the balanced bot at 3x, rendering every 20 frames, to catch runtime errors in drawing code that the sim tests do not reach.
+
+## Supabase setup (2026-10-29)
+- Project "Republic Frontline" (`polceqofpsknbajlkcvt`, us-west-1, free) in the W&W Pressure CO. org. The free plan allows 2 active projects, so Arcade Vault was paused to make room (Andrew's choice; restore it from the dashboard any time).
+- `src/config.js` uses the modern `sb_publishable_...` key, not the legacy anon JWT. `supabase/schema.sql` applied as migration `saves_table_rls`; security advisor clean; anon REST read returns "permission denied".
+- `Cloud` takes optional `{ url, key }` so the "not configured" test no longer depends on `src/config.js` being empty.
