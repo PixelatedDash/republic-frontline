@@ -45,7 +45,7 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 ## Sim rules
 - Everything in `src/sim` must stay deterministic: gameplay randomness only via `src/engine/rng.js` on `state.rng`.
 - After changing sim/data, run the tests and the bots, then re-tune and regenerate the report:
-  `node tools/sim/tune.mjs --level <id>` (writes nothing; copy the hp into `src/data/balance.js`) and
+  `node tools/sim/tune.mjs --level <id> > tune/<id>.json` per level, `node tools/sim/apply-tune.mjs tune/*.json` (writes the hp into `src/data/balance.js`), then
   `node tools/sim/report.mjs --level <id>` per level + `--write <jsons>` for BALANCE_REPORT.md. Explain intent changes in BALANCE.md.
 
 ## Commands

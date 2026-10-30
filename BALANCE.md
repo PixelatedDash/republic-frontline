@@ -18,7 +18,7 @@ Each wave is a hand-written recipe (which droids, in what proportions, in what o
 
 - `b0` rises gently through the campaign (6 on Kamino 2 to 9 on Mustafar). Wave sizes therefore grow a little faster than linear inside a level, so towers bought with earlier bounties do not trivialize the last waves.
 - Counts never exceed 30 per group (40 for Scuttler swarms), so late waves get tougher droids rather than endless streams.
-- **Difficulty knob:** each level has an `hp` scale (droid HP and shields) tuned by `tools/sim/tune.mjs`. It is the highest value at which the balanced bot still wins Jedi in at least 3 of 5 seeds and Padawan in 5 of 5. Bounties do not change with `hp`, so it is a pure difficulty dial (raising wave counts instead is not: more droids also pay more).
+- **Difficulty knob:** each level has an `hp` scale (droid HP and shields) tuned by `tools/sim/tune.mjs`. It is the highest value (scanned in 0.05 steps) at which the balanced bot still wins Jedi in at least 3 of 5 seeds and Padawan in 5 of 5, and the next step down passes too (bot results are not perfectly monotonic in HP, so a lone passing value is not trusted). Bounties do not change with `hp`, so it is a pure difficulty dial (raising wave counts instead is not: more droids also pay more).
 - Difficulty modes multiply on top: Padawan 0.8x HP and 1.2x credits, Jedi Master 1.35x HP and +20% droids.
 
 ## Expected build by wave (Jedi, balanced play)

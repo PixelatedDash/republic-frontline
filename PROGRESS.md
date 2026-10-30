@@ -77,10 +77,22 @@
 - Kashyyyk ravine and Geonosis chasm are mostly static (8 frames of slow drift); weather particles will carry most of the motion.
 - Docs commit with the live URL and these commits still need a push from GitHub Desktop.
 
-## 2026-10-27 — Phase 2 (full content) — in progress
+## 2026-10-29 — Phase 2 (full content) — complete, STOP for review
 
-**Done so far**
+**Done**
 - Sim: all 8 towers (spin-up, min range + lobbed shells, barrage, stun / chain arc / pulse, hitscan sniper with pierce and armor break, depot income, relay aura), all 14 droids (bubble shields, speed aura, heal aura, carrier split, bomber drops), all 5 bosses (phases, Foundry vents as weak points, spawners, Tidebreaker emerge, Dreadnought bombers + lights-out), boss leak table, v1 snapshot migration.
-- 19 new levels (20 total) across 5 planets, hand-written wave recipes + composer, per-level hp scale from `tools/sim/tune.mjs`.
-- Rendering: every tower/droid/boss, planet ground layers, props, weather per planet, Umbara night + tower lights, beams (sniper tracer, ion arc), pulse rings, artillery arcs, boss cinematic, boss HP bar, depot info panel, campaign level select, per-planet music.
-- Bots updated (coverage maps, per-layer need, lookahead, depots); `tools/sim/report.mjs` writes BALANCE_REPORT.md; 48 unit tests.
+- 19 new levels (20 total) across 5 planets, hand-written wave recipes + composer, per-level HP scale.
+- Rendering: every tower/droid/boss, planet ground layers, props, weather per planet, Umbara night + tower lights, beams, pulse rings, artillery arcs, boss cinematic, boss HP bar, campaign level select, per-planet music.
+- Balance pass: Sharpshooter re-priced (spam won 7 late levels), Mustafar waves carry infantry / swarms, Umbara 2 and 3 air lanes converge on the exit, Umbara 2 opening softened, balanced bot keeps a ground-need floor, tuner is a robust grid scan. `BALANCE.md` + `BALANCE_REPORT.md`.
+
+**Verified (how)**
+- Balance gates (spec §19), `BALANCE_REPORT.md` via `tools/sim/report.mjs`: balanced bot wins all 20 levels on Padawan 5/5 and Jedi >= 3/5; every spam bot loses every level from Geonosis 3 on (Jedi, 5 seeds); no-upgrades loses every boss level. "all gates pass".
+- 48 unit tests (damage/shield/stun/stacking rules, auras, splits/drops, boss phases, vents, emerge, relay, depot, levels, v1 snapshot migration); `npm test`.
+- Art lint: 982 frames, 0 orphan pixels.
+- Browser (desktop Chromium pane): Mustafar 4 and other boss levels load and play with no console errors; headless runs of every boss level.
+
+**Not verified, needs Andrew**
+- Feel and difficulty on device. The bots are a floor: Kamino 2 tuned to HP 0.6 because the bot only scrapes Jedi there (1 life left), so it may feel easy or hard to a human; Mustafar 4 no-upgrades bot reaches the final wave before losing.
+- Frame rate in big Phase 2 waves on iPhone (benchmark is Phase 5).
+- Push from GitHub Desktop (commits + tags `phase-0`..`phase-2` are local).
+
