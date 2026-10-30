@@ -103,6 +103,10 @@ export const ICONS = {
   star: ['....k....', '...kdk...', 'kkkkddkkk', 'kddddddDk', '.kdddDDk.', '..kdDDk..', '.kdDkkDk.', '.kDk..kDk', '.kk....kk'],
   heroic: ['.kk.kk.', '.kVkUk.', '..kVk..', '.kkkkk.', 'kddddDk', 'kdWdDDk', 'kddDDDk', '.kDDDk.', '..kkk..'],
   heroicEmpty: ['.kk.kk.', '.k5k6k.', '..k5k..', '.kkkkk.', 'k55556k', 'k55566k', 'k55666k', '.k666k.', '..kkk..'],
+  offUp: ['...k...', '..krk..', '.krrik.', 'krrriik', 'kkkkkkk'],
+  offDown: ['kkkkkkk', 'krrriik', '.krrik.', '..krk..', '...k...'],
+  offLeft: ['...kk', '..krk', '.krrk', 'krrik', '.krik', '..kik', '...kk'],
+  offRight: ['kk...', 'krk..', 'krrk.', 'krrik', 'krik.', 'kik..', 'kk...'],
   starEmpty: ['....k....', '...k5k...', 'kkkk55kkk', 'k5555556k', '.k55566k.', '..k566k..', '.k56kk6k.', '.k6k..k6k', '.kk....kk'],
 };
 

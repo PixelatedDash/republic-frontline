@@ -130,3 +130,7 @@ Judgment calls where the spec was silent or ambiguous. One line each, with the r
 - Project "Republic Frontline" (`polceqofpsknbajlkcvt`, us-west-1, free) in the W&W Pressure CO. org. The free plan allows 2 active projects, so Arcade Vault was paused to make room (Andrew's choice; restore it from the dashboard any time).
 - `src/config.js` uses the modern `sb_publishable_...` key, not the legacy anon JWT. `supabase/schema.sql` applied as migration `saves_table_rls`; security advisor clean; anon REST read returns "permission denied".
 - `Cloud` takes optional `{ url, key }` so the "not configured" test no longer depends on `src/config.js` being empty.
+
+## Off-screen droid arrows (2026-10-30)
+- Andrew reported an "invisible, unhittable" droid on Kamino 2 that cost a life. Not a sim or draw bug: headless runs and per-frame render checks found every droid drawn and targetable. At the default zoom the south column lands below the screen, then walks the junction row behind the build bar, so it can cross the map unseen and past towers built on the north road.
+- Fix: any droid out of view, or drawn under the build bar, gets a pulsing red arrow on the nearest edge (stacked arrows show a count). Hand-placed icons `offUp/offDown/offLeft/offRight` in `src/art/ui.js`; `GameScreen.drawOffscreen`.

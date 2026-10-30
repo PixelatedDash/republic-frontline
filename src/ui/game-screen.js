@@ -11,7 +11,7 @@ import { Camera } from '../engine/camera.js';
 import { buildGroundLayers } from '../engine/assets.js';
 import { sellValue } from '../sim/rules.js';
 import { Fx } from '../fx/fx.js';
-import { drawWorld, drawTower, towerSpritePos } from './world.js';
+import { drawWorld, drawTower, towerSpritePos, AIR_ALT } from './world.js';
 import { COLORS } from './ui.js';
 import { Tutorial } from './tutorial.js';
 import { drawSettings } from './settings.js';
@@ -515,6 +515,8 @@ export class GameScreen {
       if (BT >= 26) r.text(BUILD_KEYS[i].toUpperCase(), x + 3, y0 + 2 + dy, COLORS.faint, { font: FONT5, shadow: null });
     });
 
+    this.drawOffscreen(L, R, top, bot, { x: x0, y: y0 - 3, w: total, h: BT + 7 });
+
     // --- placement confirm (touch)
     if (this.placing && this.placing.touch) {
       const n = TOWERS[this.placing.type].size;
@@ -571,6 +573,44 @@ export class GameScreen {
     // --- menus
     if (this.menu === 'pause') this.drawPause();
     else if (this.menu === 'settings') { if (drawSettings(ui, app)) this.menu = 'pause'; }
+  }
+
+  // Droids out of view, or hidden under the build bar, get a red arrow on the
+  // nearest edge so nothing walks the map unseen. Arrows that land on the
+  // same spot merge and show a count.
+  drawOffscreen(L, R, top, bot, bar) {
+    const ui = this.app.ui, r = this.app.renderer, I = this.app.assets.icons;
+    const pips = this.pips || (this.pips = new Map());
+    pips.clear();
+    for (const e of this.s.enemies) {
+      if (!e.alive || e.part) continue;
+      const sp = this.cam.toScreen(e.x, e.y - (e.air ? AIR_ALT : 10));
+      const u = ui.toUI(sp.x, sp.y);
+      const under = u.x >= bar.x && u.x < bar.x + bar.w && u.y >= bar.y;
+      if (!under && u.x >= L && u.x < R && u.y >= top && u.y < bot) continue;
+      const ox = Math.max(L - u.x, u.x - R, 0), oy = Math.max(top - u.y, u.y - bot, 0);
+      let side, x, y;
+      if (ox > oy) {
+        side = u.x < L ? 'offLeft' : 'offRight';
+        x = side === 'offLeft' ? L : R - 5;
+        y = Math.min(bot - 7, Math.max(top, u.y - 3));
+      } else {
+        side = u.y < top ? 'offUp' : 'offDown';
+        x = Math.min(R - 7, Math.max(L, u.x - 3));
+        y = side === 'offUp' ? top : x + 7 > bar.x && x < bar.x + bar.w ? bar.y - 7 : bot - 5;
+      }
+      const key = `${side}${Math.round(x / 12)},${Math.round(y / 12)}`;
+      const p = pips.get(key);
+      if (p) p.n++;
+      else pips.set(key, { side, x: Math.round(x), y: Math.round(y), n: 1 });
+    }
+    const a = 0.75 + 0.25 * Math.sin(this.time * 8);
+    for (const p of pips.values()) {
+      r.spr(I[p.side], p.x, p.y, a);
+      if (p.n < 2) continue;
+      const tx = p.side === 'offRight' ? p.x - 2 : p.side === 'offLeft' ? p.x + 7 : p.x + 9;
+      r.text(String(p.n), tx, p.y + (p.side === 'offUp' || p.side === 'offDown' ? 0 : 1), COLORS.bad, { font: FONT5, align: p.side === 'offRight' ? 'right' : 'left', shadow: '#101217' });
+    }
   }
 
   slotIcon(type) {
