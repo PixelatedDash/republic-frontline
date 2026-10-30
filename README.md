@@ -1,7 +1,7 @@
 # Republic Frontline
 
 Pixel-art tower defense PWA (Republic clone troopers vs. the droid army). Vanilla JS + Canvas 2D, no build step.
-20 levels on 5 planets, 8 towers with tier-4 branches, 14 droids, 5 bosses, galaxy map, tech tree, medals, archives, Heroic replays and Sandbox. Offline-first, with optional cloud sync through Supabase. See `PROGRESS.md` for the current phase.
+20 levels on 5 planets, 8 towers with tier-4 branches, 14 droids, 5 bosses, galaxy map, tech tree, medals, archives, Heroic replays and Sandbox. Offline-first, with optional cloud sync through Supabase. See `PROGRESS.md` for the build log, `ACCEPTANCE.md` for the final checklist and `BENCHMARK.md` for performance.
 
 **Play it:** https://pixelateddash.github.io/republic-frontline/ (GitHub Pages from `main` / root; every push to `main` redeploys).
 
@@ -74,6 +74,8 @@ node tools/export-art.mjs   # art deck -> art-preview.pptx + art-preview/*.png
 node tools/art/lint-art.mjs # orphan-pixel check
 node tools/export-icons.mjs # PWA icons from the art code -> icons/
 node tools/build-precache.mjs # service worker file list + version (run before committing game files)
+node tools/bench/run.mjs --throttle 4 --gpu 1   # benchmark (see BENCHMARK.md)
+node tools/art/qa-sweep.mjs # plays every level through the real game screen
 ```
 
 `vendor/supabase.js` is the UMD build of `@supabase/supabase-js` (pinned in `package.json`), copied from `node_modules/@supabase/supabase-js/dist/umd/supabase.js`. It only loads when `src/config.js` has a URL and key.

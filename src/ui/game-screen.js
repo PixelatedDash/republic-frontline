@@ -483,7 +483,7 @@ export class GameScreen {
       if (ui.button(`hud:spd${i}`, bx + i * (T + 2), top, T, T, { label: `${i}x`, active: this.speed === i && !this.paused })) { this.speed = i; this.paused = false; }
     if (ui.button('hud:menu', bx + (speeds + 1) * (T + 2), top, T, T, { icon: A.icons.menu })) this.menu = 'pause';
     if (s.heroic) r.text(`HEROIC: ${s.allowedTowers.length} TOWER TYPES`, R, top + T + 4, COLORS.warn, { align: 'right' });
-    if (this.paused && !this.menu) r.text('PAUSED - YOU CAN STILL BUILD', vw / 2, top + T + 16, COLORS.warn, { align: 'center' });
+    if (this.paused && !this.menu) r.text('PAUSED - YOU CAN STILL BUILD', this.sandbox ? Math.max(vw / 2, L + 160 + 70) : vw / 2, top + T + 16, COLORS.warn, { align: 'center' });
 
     // --- build bar
     const slots = SLOT_TYPES.map((t) => (TOWERS[t] && s.allowedTowers.includes(t) ? t : null));

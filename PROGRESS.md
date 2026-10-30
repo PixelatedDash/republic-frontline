@@ -145,3 +145,25 @@ Andrew asked me to keep going through the remaining phases while away ("do all w
 - Login and sync against a real Supabase project: no project or keys were provided, so it is unverified end to end (only against a fake client in tests). Follow README "Cloud sync with Supabase", then log in on phone and desktop.
 - PWA install from Safari, launch without browser chrome, airplane mode (needs the HTTPS deploy on a real iPhone).
 - Push from GitHub Desktop (commits and tags `phase-0`..`phase-4` are local).
+
+## 2026-10-29 — Phase 5 (polish and performance) — complete, final STOP
+
+**Done**
+- Benchmark: `?bench=1` scene + `tools/bench/run.mjs` (Playwright, 4x CPU throttle, p50/p95/p99, dynamic quality), `tools/bench/profile.mjs`, `tools/bench/boot.mjs`. Results in `BENCHMARK.md`.
+- Dynamic quality fix: it could drop but never recover at 60 fps; recovery now uses measured work time. Debug overlay shows CPU ms per frame.
+- Final balance pass: `BALANCE_REPORT.md` regenerated, identical to Phase 2, all gates pass.
+- Bug fixes: half-pixel sprite fitting (now whole device pixels only), IndexedDB hang at boot (3 s timeout -> localStorage), medals earned on the Medals screen not saved, Sandbox pause label overlapping the spawner, tech-screen medal notice tied to frame rate.
+- QA sweep tool: all 20 levels played through the real GameScreen with rendering, no errors.
+- Acceptance report: `ACCEPTANCE.md` (every spec §21 item with how it was verified).
+
+**Verified (how)**
+- 67 tests (`npm test`), incl. new `tests/acceptance.test.mjs` (all 8 towers x every tier path fire), `tests/game-screen.test.mjs` (1x/2x/3x, pause, build while paused through the real GameScreen), `tests/scaling.test.mjs` (12 sizes x 6 DPRs).
+- Benchmark (BENCHMARK.md): GPU raster at DPR 3 + 4x throttle holds 60 fps (p95 16.7 ms) with ~241 droids / ~399 projectiles / ~1479 particles, quality back to 0 in 2 s. Software raster at DPR 3 is fill-bound at ~24 fps (worst case, reported).
+- Boot: 0.54 s median (2.0 s at 4x throttle).
+- Art lint 1042 frames, 0 orphan pixels. QA sweep: 20/20 levels, no errors. Small-phone layout (667x375) checked in the browser.
+
+**Not verified, needs Andrew** (also in ACCEPTANCE.md)
+- On the iPhone: crisp pixels, 60 fps in big waves (Debug overlay), touch placement / pinch / pan, portrait overlay, audio unlock + backgrounding, PWA install + airplane mode.
+- Supabase login and sync against a real project (README "Cloud sync with Supabase").
+- Difficulty and fun (bots are a floor; Heroic replays are untested for winnability since the bot never wins Jedi Master).
+- Push from GitHub Desktop: commits and tags `phase-0`..`phase-5` are local only.

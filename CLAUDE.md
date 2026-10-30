@@ -57,6 +57,7 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 - `node tools/export-art-2.mjs` — Phase 2 art checkpoint deck (`art-preview-2/`, `art-preview-2.pptx`)
 - `node tools/art/lint-art.mjs` — orphan-pixel check on every composed tower/enemy/boss/prop frame (Phase 1 + 2)
 - `node tools/serve.mjs [port] [--lan]` — no-cache dev server (`--lan` to test on a phone over Wi-Fi; no service worker over http)
+- `node tools/bench/run.mjs --throttle 4 [--gpu 1]` — benchmark (BENCHMARK.md); `node tools/art/qa-sweep.mjs` — every level through the real GameScreen
 - `npm test` — unit tests; `node tools/sim/run.mjs --level kamino-1 --difficulty jedi --bot balanced --seeds 5` — headless bots
 - `?skip=1` (Kamino 1) or `?skip=<level-id>` jumps into a level (`&heroic=1`), `?sandbox=<level-id>`, `?screen=galaxy|tech|medals|archives`; `?unlock=1` opens every level (dev shortcuts)
 - After any art export: open the PNGs in `art-preview/` and critique them against the art rules before presenting.

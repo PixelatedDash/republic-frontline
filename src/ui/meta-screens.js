@@ -44,12 +44,19 @@ function routeUi(app, events, onKey) {
 // Draw a 2x-detail sprite centred in a box: full HI scale, or half / quarter
 // when it would not fit (whole device pixels either way).
 export function fitHi(app, ref, x, y, w, h, maxUp = 1) {
-  const sc = app.sc;
-  const bw = ref.w * sc.HIR, bh = ref.h * sc.HIR;
-  let m = maxUp;
-  while (m > 1 && (bw * m > w || bh * m > h)) m--;
-  while ((bw * m > w || bh * m > h) && m > 0.25) m /= 2;
-  app.renderer.hi(ref, Math.round(x + (w - bw * m) / 2), Math.round(y + (h - bh * m) / 2), 1, sc.HI * m);
+  const sc = app.sc, r = app.renderer;
+  // whole device pixels per art pixel only (k = HI x m must be an integer)
+  const ks = [];
+  for (let m = maxUp; m >= 1; m--) ks.push(sc.HI * m);
+  for (let d = 2; sc.HI / d >= 1; d *= 2) if (Number.isInteger(sc.HI / d)) ks.push(sc.HI / d);
+  const size = (k) => [ref.w * k / sc.S, ref.h * k / sc.S];
+  let k = ks.find((q) => { const [iw, ih] = size(q); return iw <= w && ih <= h; });
+  const clip = k === undefined;
+  if (clip) k = ks[ks.length - 1];
+  const [iw, ih] = size(k);
+  if (clip) { r.ctx.save(); r.ctx.beginPath(); r.ctx.rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); r.ctx.clip(); }
+  r.hi(ref, Math.round(x + (w - iw) / 2), Math.round(y + (h - ih) / 2), 1, k);
+  if (clip) r.ctx.restore();
 }
 
 // Parallax starfield + drifting nebula (galaxy, tech, medals, archives).
@@ -280,6 +287,7 @@ export class TechScreen {
   }
   update(dt, events) {
     this.t += dt;
+    if (this.medal) this.medal.t -= dt;
     this.space.update(dt);
     routeUi(this.app, events, (k) => { if (k === 'Escape') this.app.go(() => this.app.toGalaxy()); });
   }
@@ -298,7 +306,7 @@ export class TechScreen {
   }
   changed() {
     const got = awardAchievements(this.app.save);
-    if (got.length) this.app.toast?.(`MEDAL: ${ACHIEVEMENTS.find((a) => a.id === got[0]).name}`);
+    if (got.length) this.medal = { name: ACHIEVEMENTS.find((a) => a.id === got[0]).name, t: 2.5 };
     this.app.saveProgress();
   }
   render() {
@@ -314,6 +322,7 @@ export class TechScreen {
     for (let y = top + 2; y < bot - 2; y += 3) r.rect(L + 2, y, W - 4, 1, '#7cf0ff', 0.03);
     const free = starsEarned(s) - starsSpent(s);
     r.text('REQUISITION TERMINAL', L + 8, top + 6, COLORS.accent);
+    if (this.medal?.t > 0) r.text(`MEDAL EARNED: ${this.medal.name}`, (L + R) / 2, top + 6, COLORS.warn, { align: 'center' });
     r.text(`STARS AVAILABLE ${free}`, R - 8, top + 6, free > 0 ? COLORS.warn : COLORS.dim, { align: 'right' });
     r.text(`TREE ${starsSpent(s)} / ${TECH_TOTAL} · EARNED ${starsEarned(s)} / ${MAX_STARS} · REFUNDS ARE FREE`, L + 8, top + 16, COLORS.dim);
     // 8 columns
@@ -374,7 +383,7 @@ export class MedalsScreen {
     this.tab = tab;
     this.sel = null;
     this.M = app.ensureMedals();
-    awardAchievements(app.save);
+    if (awardAchievements(app.save).length) app.saveProgress();
   }
   update(dt, events) {
     this.space.update(dt);

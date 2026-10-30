@@ -20,6 +20,7 @@ import { ACHIEVEMENTS, awardAchievements } from './data/meta.js';
 import { Cloud } from './save/cloud.js';
 import { AccountScreen } from './ui/account.js';
 import { COLORS } from './ui/ui.js';
+import { BenchScreen } from './ui/bench.js';
 import { Storage } from './save/storage.js';
 import { snapshot } from './sim/sim.js';
 import { starsFor } from './save/schema.js';
@@ -280,7 +281,8 @@ let last = performance.now();
 function frame(t) {
   const dtMs = Math.min(100, t - last);
   last = t;
-  app.perf.frame(dtMs);
+  app.perf.frame(dtMs, app.lastWork ?? null);
+  const w0 = performance.now();
   let events = app.input.drain();
   requestAnimationFrame(frame);
   if (!app.screen) return;
@@ -292,6 +294,7 @@ function frame(t) {
     app.screen.render();
     if (app.trans) drawTransition(dtMs / 1000);
     drawToast();
+    app.lastWork = performance.now() - w0;
   } catch (e) {
     // keep the loop alive; report each distinct error once
     const key = String(e && e.stack).slice(0, 200);
@@ -318,6 +321,7 @@ async function boot() {
   const skip = q.get('skip');
   if (skip) app.startLevel(LEVELS[skip] ? skip : 'kamino-1', q.get('difficulty') || 'jedi', !!q.get('heroic'));
   if (q.get('sandbox')) app.startSandbox(LEVELS[q.get('sandbox')] ? q.get('sandbox') : 'geonosis-1');
+  if (q.get('bench')) app.setScreen(new BenchScreen(app, { seconds: Number(q.get('seconds')) || 30, level: q.get('level') || 'mustafar-2' }));
   if (q.get('screen') === 'galaxy') app.toGalaxy(q.get('planet'));
   if (q.get('screen') === 'tech') app.toTech();
   if (q.get('screen') === 'medals') app.toMedals();
