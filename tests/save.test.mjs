@@ -36,7 +36,7 @@ test('merge: max per field, never loses progress', () => {
   b.unlocks.sandbox = true;
   b.settings.master = 0.2;
   const m = mergeSaves(a, b);
-  assert.deepEqual(m.levels['kamino-1'], { stars: 3, heroic: true, bestLives: 20, wins: 5 });
+  assert.deepEqual(m.levels['kamino-1'], { stars: 3, heroic: true, bestLives: 20, wins: 5, master: false });
   assert.equal(m.levels['kamino-2'].stars, 1);
   assert.deepEqual(m.stats.kills, { trooper: 500, rush: 10, scuttler: 40 });
   assert.equal(m.unlocks.sandbox, true);

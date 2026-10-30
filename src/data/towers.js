@@ -137,8 +137,9 @@ export function tierStats(type, tier) {
 }
 
 // DPS shown in the info panel (single target, before armor/shields).
-export function towerDps(type, tier) {
-  const t = tierStats(type, tier);
+// `st` overrides the data tier (the sim's tech-adjusted stats).
+export function towerDps(type, tier, st = null) {
+  const t = st || tierStats(type, tier);
   if (!t.rate) return 0;
   const crit = t.crit ? 1 + t.crit.chance * (t.crit.mult - 1) : 1;
   const bomb = t.bomblets ? t.bomblets.count * t.bomblets.dmg * 0.3 : 0;

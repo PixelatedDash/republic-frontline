@@ -11,7 +11,7 @@ import { DIRS8 } from '../art/towers.js';
 import { TROOPER_FRAME } from '../art/sprites/troopers.js';
 import { rangeCircle, gridCell, gridDots } from '../art/ui.js';
 import { shadowFor } from '../engine/assets.js';
-import { towerRange } from '../sim/sim.js';
+import { towerRange, towerStats } from '../sim/sim.js';
 
 const TAU = Math.PI * 2;
 export const AIR_ALT = 44;
@@ -155,7 +155,7 @@ export function drawWorld(v) {
         const ok = sim.level.buildable(placing.tx + x, placing.ty + y) && placing.valid;
         r.spr(r.cached(ok ? 'cellOk' : 'cellBad', () => gridCell(ok, TILE)), (placing.tx + x) * TILE, (placing.ty + y) * TILE);
       }
-    const st = TOWERS[placing.type].tiers.t1;
+    const st = towerStats(sim.state, placing.type, 't1');
     const cx = (placing.tx + n / 2) * TILE, cy = (placing.ty + n / 2) * TILE;
     if (st.range) {
       const rc = r.cached(`rc${st.range}${st.minRange || 0}${placing.valid}`, () => rangeCircle(st.range, { valid: placing.valid, min: st.minRange || 0 }));
@@ -163,7 +163,7 @@ export function drawWorld(v) {
     }
   }
   if (sel) {
-    const st = TOWERS[sel.type].tiers[sel.tier];
+    const st = towerStats(sim.state, sel.type, sel.tier);
     const range = Math.round(towerRange(sel, st));
     if (range) {
       const rc = r.cached(`rc${range}${st.minRange || 0}true`, () => rangeCircle(range, { min: st.minRange || 0 }));

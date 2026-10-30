@@ -2,6 +2,8 @@
 // (an opaque pixel with no opaque 4-neighbor).   node tools/art/lint-art.mjs
 import { buildArt, buildArtPhase2, TIERS } from '../../src/art/index.js';
 import { composeRifle, composeTurret, DIRS8 } from '../../src/art/towers.js';
+import { medal, MEDAL_GLYPHS } from '../../src/art/medals.js';
+import { cruiser } from '../../src/art/galaxy.js';
 
 const art = buildArt();
 const orphans = (b) => {
@@ -37,6 +39,9 @@ const B = a2.bosses;
 const bossFrames = { tidebreaker: [...B.tidebreaker.walk, ...B.tidebreaker.deploy], foundry: [...B.foundry.walk, B.foundry.compose(0, { doorState: 2, broken: [0, 1, 2] })], reaper: [...B.reaper.walk, ...B.reaper.armored], dreadnought: B.dreadnought.frames.flat(), warlord: B.warlord.phases.flat() };
 for (const [k, list] of Object.entries(bossFrames)) list.forEach((f, i) => frames.push([`boss ${k} ${i}`, f]));
 for (const [p, t] of Object.entries(a2.tiles)) Object.entries(t.props).forEach(([n, f]) => frames.push([`prop ${p} ${n}`, f]));
+// Phase 3: medals (earned + locked) and the galaxy cruiser
+for (const id of Object.keys(MEDAL_GLYPHS)) { frames.push([`medal ${id}`, medal(id, true)]); frames.push([`medal ${id} locked`, medal(id, false)]); }
+cruiser().forEach((f, i) => frames.push([`cruiser ${i}`, f]));
 
 const bad = frames.map(([n, f]) => [n, orphans(f)]).filter(([, c]) => c > 0);
 console.log(`lint-art: ${frames.length} frames, ${bad.length} with orphan pixels`);

@@ -11,11 +11,14 @@ import { seedState, rand } from '../engine/rng.js';
 import { SpatialHash } from './spatial.js';
 import * as R from './rules.js';
 
-export const SAVE_SIM_VERSION = 2;
+export const SAVE_SIM_VERSION = 3;
 export const TARGET_MODES = ['first', 'last', 'strongest', 'closest', 'air'];
 
 // ------------------------------------------------------------------ setup --
-export function createSim({ levelId, difficulty = 'jedi', seed = 1, heroic = false, allowedTowers = null }) {
+// tech: { mods, locked } from the tech tree (src/data/meta.js simTech), or
+// null = every tier-4 branch open, no stat mods (bots, tests, Sandbox).
+// sandbox: no waves, unlimited credits, spawns via sandboxSpawn().
+export function createSim({ levelId, difficulty = 'jedi', seed = 1, heroic = false, allowedTowers = null, tech = null, sandbox = false }) {
   const def = LEVELS[levelId];
   if (!def) throw new Error(`unknown level ${levelId}`);
   const diff = DIFFICULTY[heroic ? 'heroic' : difficulty];
@@ -38,8 +41,15 @@ export function createSim({ levelId, difficulty = 'jedi', seed = 1, heroic = fal
     enemies: [], towers: [], projectiles: [],
     nextId: 1,
     allowedTowers: allowedTowers || def.towers,
-    stats: { kills: {}, killsTotal: 0, leaked: 0, creditsEarned: 0, built: 0, shots: 0, leakedTypes: {}, bossKills: 0 },
+    tech: tech ? JSON.parse(JSON.stringify(tech)) : null,
+    sandbox: sandbox ? { invincible: false } : null,
+    stats: { kills: {}, killsTotal: 0, leaked: 0, creditsEarned: 0, built: 0, shots: 0, leakedTypes: {}, bossKills: 0, sold: 0, earlyCalls: 0, ventsDown: 0, maxDepots: 0, t4Built: 0 },
   };
+  if (sandbox) {
+    state.credits = SANDBOX_CREDITS;
+    state.totalWaves = 0;
+    state.phase = 'running';
+  }
   return attach(state);
 }
 
@@ -80,6 +90,12 @@ function migrateState(s) {
     s.stats.bossKills ??= 0;
     s.v = 2;
   }
+  if (s.v < 3) {
+    s.tech ??= null;
+    s.sandbox ??= null;
+    for (const k of ['sold', 'earlyCalls', 'ventsDown', 'maxDepots', 't4Built']) s.stats[k] ??= 0;
+    s.v = 3;
+  }
   return s;
 }
 
@@ -88,6 +104,38 @@ function ev(sim, e) {
 }
 
 const diffOf = (s) => DIFFICULTY[s.heroic ? 'heroic' : s.difficulty];
+const SANDBOX_CREDITS = 99999;
+
+// Effective tower stats: the data tier x the tech-tree mods in state.tech.
+// Merged objects are cached per tech block (snapshots stay plain JSON).
+const statCache = new WeakMap();
+export function towerStats(s, type, tier) {
+  const base = TOWERS[type].tiers[tier];
+  const m = s?.tech?.mods?.[type];
+  if (!m) return base;
+  let c = statCache.get(s.tech);
+  if (!c) statCache.set(s.tech, (c = new Map()));
+  const key = type + tier;
+  let st = c.get(key);
+  if (!st) {
+    st = { ...base };
+    if (m.cost) st.cost = Math.round(base.cost * m.cost);
+    if (m.dmg && base.dmg) st.dmg = base.dmg * m.dmg;
+    if (m.range && base.range) st.range = Math.round(base.range * m.range);
+    if (m.rate && base.rate) st.rate = base.rate * m.rate;
+    if (m.splash && base.splash) st.splash = Math.round(base.splash * m.splash);
+    if (m.income && base.income) st.income = Math.round(base.income * m.income);
+    c.set(key, st);
+  }
+  return st;
+}
+
+// Next tiers a tower can take, minus tier-4 branches the tech tree still locks.
+export function tierOptions(s, t) {
+  const locked = s.tech?.locked?.[t.type];
+  const opts = nextTiers(t.tier);
+  return locked ? opts.filter((x) => !locked.includes(x)) : opts;
+}
 // Droid HP / shield multiplier: difficulty x the level's tuned hpScale.
 const hpMultOf = (s) => diffOf(s).hp * (LEVELS[s.levelId].hpScale || 1);
 
@@ -183,9 +231,26 @@ export function startWave(sim) {
   const bonus = R.earlyCallBonus(s.countdown, s.countdownTotal, s.waveIndex, s.totalWaves);
   s.credits += bonus;
   s.stats.creditsEarned += bonus;
+  s.stats.earlyCalls++;
   ev(sim, { t: 'earlyCall', bonus });
   launchWave(sim);
   return { ok: true, bonus };
+}
+
+// Sandbox spawner: `count` droids of `type` (a boss spawns alone), spread
+// over the level's ground paths or air lanes, a short gap apart.
+export function sandboxSpawn(sim, type, count = 1) {
+  const s = sim.state;
+  if (!s.sandbox || !ENEMIES[type]) return { ok: false };
+  const d = ENEMIES[type];
+  const air = d.layer === 'air';
+  const routes = air ? sim.level.lanes.length : sim.level.paths.length;
+  const n = d.boss ? 1 : Math.max(1, Math.min(60, count));
+  const gap = d.boss ? 0 : Math.max(0.2, 1.2 - n * 0.02);
+  for (let i = 0; i < n; i++) s.pending.push({ at: s.time + i * gap, type, path: i % routes, lane: i % routes, wave: 0, o: s.nextId + i });
+  s.pending.sort((a, b) => a.at - b.at || a.o - b.o);
+  s.waveLeft[0] = (s.waveLeft[0] || 0) + n;
+  return { ok: true, count: n };
 }
 
 // ---------------------------------------------------------------- enemies --
@@ -230,7 +295,8 @@ function spawnEnemy(sim, p) {
   const d = ENEMIES[p.type];
   const air = d.layer === 'air';
   const ofs = air || d.boss ? 0 : (rand(sim.state.rng) - 0.5) * 12;
-  const e = makeEnemy(sim, p.type, p.wave, air, air ? p.lane : p.path, 0, ofs);
+  const route = Math.min(air ? sim.level.lanes.length - 1 : sim.level.paths.length - 1, air ? p.lane : p.path);
+  const e = makeEnemy(sim, p.type, p.wave, air, route, 0, ofs);
   ev(sim, { t: 'spawn', id: e.id, type: e.type, x: e.x, y: e.y, boss: !!e.boss });
   if (e.boss) {
     if (d.vents) {
@@ -271,7 +337,7 @@ function collectAuras(sim) {
     if (d.heal) A.heal.push({ x: e.x, y: e.y, r: d.heal.r, v: d.heal.rate, id: e.id });
   }
   for (const t of sim.state.towers) {
-    const st = TOWERS[t.type].tiers[t.tier];
+    const st = towerStats(sim.state, t.type, t.tier);
     if (st.aura) A.relay.push({ x: t.x, y: t.y, r: st.range, v: st.aura.rate, id: t.id });
   }
 }
@@ -422,7 +488,7 @@ function leak(sim, e) {
   e.alive = false;
   e.leaked = true;
   const d = ENEMIES[e.type];
-  const cost = R.leakCost(d, diffOf(s));
+  const cost = s.sandbox?.invincible ? 0 : R.leakCost(d, diffOf(s));
   s.lives = Math.max(0, s.lives - cost);
   s.stats.leaked += 1;
   s.stats.leakedTypes[e.type] = (s.stats.leakedTypes[e.type] || 0) + 1;
@@ -437,6 +503,7 @@ function kill(sim, e, towerId) {
   if (e.part) {
     const parent = sim.byId.get(e.parent);
     if (parent && parent.alive) parent.ventsAlive--;
+    s.stats.ventsDown++;
     s.credits += 20;
     s.stats.creditsEarned += 20;
     ev(sim, { t: 'ventDown', id: e.id, parent: e.parent, slot: e.slot, x: e.x, y: e.y });
@@ -510,7 +577,7 @@ export function canPlace(sim, type, tx, ty) {
       }
     }
   if (type === 'depot' && !R.canBuildDepot(s.towers)) return { ok: false, why: 'depotLimit' };
-  if (s.credits < TOWERS[type].tiers.t1.cost) return { ok: false, why: 'credits' };
+  if (s.credits < towerStats(s, type, 't1').cost) return { ok: false, why: 'credits' };
   return { ok: true };
 }
 
@@ -518,32 +585,34 @@ export function build(sim, type, tx, ty) {
   const c = canPlace(sim, type, tx, ty);
   if (!c.ok) return c;
   const s = sim.state;
-  const cost = TOWERS[type].tiers.t1.cost;
+  const cost = towerStats(s, type, 't1').cost;
   s.credits -= cost;
   const { x, y } = towerCenter(type, tx, ty);
   const t = { id: s.nextId++, type, tier: 't1', tx, ty, x, y, spent: cost, fired: false, cd: 0.2, target: 0, aim: Math.PI / 2, mode: 'first', kills: 0, placedWavesEnded: s.wavesEnded, salvo: 0, salvoT: 0, retarget: 0, spin: 0, idle: 0, dim: 0 };
   s.towers.push(t);
   s.stats.built++;
+  if (type === 'depot') s.stats.maxDepots = Math.max(s.stats.maxDepots, s.towers.filter((q) => q.type === 'depot').length);
   ev(sim, { t: 'build', id: t.id, type, x, y });
   return { ok: true, id: t.id };
 }
 
-export function upgradeCost(tower, tier) {
-  return TOWERS[tower.type].tiers[tier].cost;
+export function upgradeCost(tower, tier, s = null) {
+  return towerStats(s, tower.type, tier).cost;
 }
 
 export function upgrade(sim, id, tier) {
   const s = sim.state;
   const t = s.towers.find((x) => x.id === id);
   if (!t) return { ok: false, why: 'missing' };
-  const options = nextTiers(t.tier);
+  const options = tierOptions(s, t);
   const want = tier || options[0];
-  if (!options.includes(want)) return { ok: false, why: 'tier' };
-  const cost = upgradeCost(t, want);
+  if (!options.includes(want)) return { ok: false, why: nextTiers(t.tier).includes(want) ? 'locked' : 'tier' };
+  const cost = upgradeCost(t, want, s);
   if (s.credits < cost) return { ok: false, why: 'credits' };
   s.credits -= cost;
   t.spent += cost;
   t.tier = want;
+  if (want === 't4a' || want === 't4b') s.stats.t4Built++;
   ev(sim, { t: 'upgrade', id, tier: want, x: t.x, y: t.y, type: t.type });
   return { ok: true };
 }
@@ -555,6 +624,7 @@ export function sell(sim, id) {
   const t = s.towers[i];
   const v = R.sellValue(t, s.wavesEnded);
   s.credits += v;
+  s.stats.sold++;
   s.towers.splice(i, 1);
   ev(sim, { t: 'sell', id, value: v, x: t.x, y: t.y, type: t.type });
   return { ok: true, value: v };
@@ -608,7 +678,7 @@ function inRange(t, e, r, minR = 0) {
 
 function updateTower(sim, t) {
   const s = sim.state;
-  const st = TOWERS[t.type].tiers[t.tier];
+  const st = towerStats(s, t.type, t.tier);
   if (t.dim > 0) t.dim = Math.max(0, t.dim - DT);
   if (!st.rate) return; // Supply Depot
   t.cd -= DT;
@@ -885,13 +955,17 @@ export function step(sim) {
       const planet = LEVELS[s.levelId].planet;
       const intr = R.interest(s.credits, planet);
       let depot = 0;
-      for (const t of s.towers) depot += TOWERS[t.type].tiers[t.tier].income || 0;
+      for (const t of s.towers) depot += towerStats(s, t.type, t.tier).income || 0;
       s.credits += intr + depot;
       s.stats.creditsEarned += intr + depot;
       ev(sim, { t: 'waveEnd', n: i + 1, interest: intr, depot, income: intr + depot });
     }
   }
 
+  if (s.sandbox) {
+    s.credits = SANDBOX_CREDITS;
+    return;
+  }
   if (s.lives <= 0) {
     s.phase = 'lost';
     ev(sim, { t: 'defeat', wave: s.waveIndex });

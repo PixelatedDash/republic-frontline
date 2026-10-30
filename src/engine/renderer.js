@@ -177,11 +177,13 @@ export class Renderer {
   }
 
   panel(x, y, w, h, opts = {}) {
+    w = Math.round(w); h = Math.round(h);
     const ref = this.cached(`p${w}x${h}${opts.title ? 't' : ''}${opts.alpha ?? ''}`, () => panelBm(w, h, opts));
     this.spr(ref, x, y);
   }
 
   button(x, y, w, h, opts = {}) {
+    w = Math.round(w); h = Math.round(h);
     const ref = this.cached(`b${w}x${h}${opts.style || 'n'}${opts.pressed ? 'p' : ''}`, () => buttonBm(w, h, opts));
     this.spr(ref, x, y);
   }

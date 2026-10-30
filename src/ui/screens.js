@@ -1,5 +1,5 @@
-// Boot, title, briefing (pre-level) and result screens for the Phase 1
-// slice. The full galaxy map / meta screens arrive in Phase 3.
+// Boot, title, briefing (pre-level panel) and result screens. The galaxy
+// map and the other meta screens live in meta-screens.js.
 
 import { COLORS } from './ui.js';
 import { drawSettings } from './settings.js';
@@ -8,6 +8,8 @@ import { ENEMIES } from '../data/enemies.js';
 import { DIFFICULTY } from '../data/rules.js';
 import { wrapText } from './game-screen.js';
 import { buildGroundLayers } from '../engine/assets.js';
+import { HEROIC_TOWERS, heroicUnlocked, ACHIEVEMENTS } from '../data/meta.js';
+import { TOWERS } from '../data/towers.js';
 
 // Shared animated backdrop: the Kamino battlefield drifting under rain.
 class Backdrop {
@@ -114,11 +116,17 @@ export class TitleScreen {
     const ip = app.save.inProgress;
     if (!this.menu) {
       if (ip && btn('t:continue', `CONTINUE (WAVE ${ip.snapshot.wavesEnded + 1})`, 'accent')) app.continueLevel();
-      if (btn('t:play', 'CAMPAIGN', ip ? 'normal' : 'accent')) app.toCampaign();
-      if (btn('t:settings', 'SETTINGS', 'normal')) this.menu = 'settings';
+      if (btn('t:play', 'PLAY', ip ? 'normal' : 'accent')) app.go(() => app.toGalaxy());
+      // two half-width rows keep the menu short on phones
+      const hw = (bw - 4) >> 1;
+      if (ui.button('t:archives', cx - bw / 2, by, hw, T, { label: 'ARCHIVES' })) app.go(() => app.toArchives());
+      if (ui.button('t:medals', cx - bw / 2 + hw + 4, by, hw, T, { label: 'MEDALS' })) app.go(() => app.toMedals());
+      by += T + 5;
+      if (ui.button('t:settings', cx - bw / 2, by, hw, T, { label: 'SETTINGS' })) this.menu = 'settings';
+      if (ui.button('t:account', cx - bw / 2 + hw + 4, by, hw, T, { label: 'ACCOUNT' })) app.toAccount?.();
     }
-    r.text('PHASE 2 FULL CONTENT · LOCAL SAVE', 6 + ui.ins.left, ui.vh - 11 - ui.ins.bottom, COLORS.faint);
-    if (ui.vw >= 460) r.text('ARCHIVES · MEDALS · ACCOUNT: LATER PHASES', ui.vw - 6 - ui.ins.right, ui.vh - 11 - ui.ins.bottom, COLORS.faint, { align: 'right' });
+    const sync = app.syncStatus?.() || 'LOCAL SAVE';
+    r.text(sync, 6 + ui.ins.left, ui.vh - 11 - ui.ins.bottom, COLORS.faint);
     if (this.menu === 'settings' && drawSettings(ui, app)) this.menu = null;
     if (app.save.settings.debug) r.text(`S ${app.sc.S} VIEW ${ui.vw}x${ui.vh} DPR ${app.sc.dpr} TAP ${app.sc.tap}`, 6, 6, COLORS.dim);
     ui.endFrame();
@@ -134,6 +142,8 @@ export class BriefingScreen {
     this.bg = new Backdrop(app);
     this.t = 0;
     this.difficulty = app.lastDifficulty || 'jedi';
+    this.heroic = false;
+    this.canHeroic = heroicUnlocked(app.save, levelId);
     const types = new Set();
     for (const w of this.def.waves) for (const g of w.groups) types.add(g.type);
     this.types = [...types].filter((t) => !ENEMIES[t].boss);
@@ -149,12 +159,13 @@ export class BriefingScreen {
       else if (e.type === 'move') ui.move(e.id, e.x, e.y);
       else if (e.type === 'up' || e.type === 'cancel') ui.up(e.id, e.x, e.y);
       else if (e.type === 'key' && e.key === 'Enter') this.deploy();
-      else if (e.type === 'key' && e.key === 'Escape') this.app.toCampaign();
+      else if (e.type === 'key' && e.key === 'Escape') this.app.go(() => this.app.toGalaxy(this.def.planet));
     }
   }
   deploy() {
     this.app.lastDifficulty = this.difficulty;
-    this.app.startLevel(this.levelId, this.difficulty);
+    const { levelId, difficulty, heroic } = this;
+    this.app.go(() => this.app.startLevel(levelId, heroic ? 'master' : difficulty, heroic));
   }
   render() {
     const app = this.app, r = app.renderer, ui = app.ui, A = app.assets, T = ui.T;
@@ -205,14 +216,27 @@ export class BriefingScreen {
       const lines = wrapText(this.types.map((t) => ENEMIES[t].name.toUpperCase()).join(', '), Math.floor((w - 16) / 5));
       lines.forEach((l, i) => { if (ey + 24 + i * 9 + 7 < dy - 10) r.text(l, x + 8, ey + 24 + i * 9, COLORS.faint); });
     }
-    r.text('DIFFICULTY', x + 8, dy - 9, COLORS.dim);
-    const dw = Math.floor((w - 16 - 8) / 3);
-    ['padawan', 'jedi', 'master'].forEach((d, i) => {
-      const D = DIFFICULTY[d];
-      if (ui.button(`b:diff:${d}`, x + 8 + i * (dw + 4), dy, dw, T, { label: D.name.toUpperCase(), active: this.difficulty === d, sub: T >= 28 ? `${D.lives} LIVES` : null })) this.difficulty = d;
-    });
+    r.text(this.heroic ? 'HEROIC: MASTER DROIDS · 11 LIVES · BOSS LEAK = LOSS' : 'DIFFICULTY', x + 8, dy - 9, this.heroic ? COLORS.warn : COLORS.dim, {});
+    const cols = this.canHeroic ? 4 : 3;
+    const dw = Math.floor((w - 16 - 4 * (cols - 1)) / cols);
+    if (this.heroic) {
+      // the fixed tower set for this level's Heroic replay
+      HEROIC_TOWERS[this.levelId].forEach((t, i) => {
+        const ref = r.cached(`slotIcon:${t}`, () => app.makeTowerIcon(t));
+        const bx = x + 8 + i * (dw + 4);
+        r.panel(bx, dy, dw, T);
+        r.hi(ref, bx + 3, dy + Math.max(1, (T - ref.h * app.sc.HIR) / 2));
+        r.text(TOWERS[t].short.split(' ')[0].slice(0, Math.max(3, Math.floor((dw - 24) / 5))), bx + dw - 4, dy + ((T - 7) >> 1), COLORS.text, { align: 'right' });
+      });
+    } else {
+      ['padawan', 'jedi', 'master'].forEach((d, i) => {
+        const D = DIFFICULTY[d];
+        if (ui.button(`b:diff:${d}`, x + 8 + i * (dw + 4), dy, dw, T, { label: D.name.toUpperCase(), active: this.difficulty === d, sub: T >= 28 ? `${D.lives} LIVES` : null })) this.difficulty = d;
+      });
+    }
     const by = y + h - T - 6;
-    if (ui.button('b:back', x + 8, by, 70, T, { label: 'BACK' })) app.toCampaign();
+    if (this.canHeroic && ui.button('b:heroic', x + 84, by, 90, T, { label: this.heroic ? 'HEROIC: ON' : 'HEROIC', style: this.heroic ? 'good' : 'normal', icon: null })) this.heroic = !this.heroic;
+    if (ui.button('b:back', x + 8, by, 70, T, { label: 'BACK' })) app.go(() => app.toGalaxy(this.def.planet));
     if (ui.button('b:go', x + w - 8 - 110, by, 110, T, { label: 'DEPLOY', style: 'accent' })) this.deploy();
     ui.endFrame();
   }
@@ -270,7 +294,7 @@ export class ResultScreen {
     r.begin();
     this.bg.draw(r, ui);
     ui.beginFrame();
-    const w = Math.min(300, ui.vw - 16), h = Math.min(ui.vh - 12, 200);
+    const w = Math.min(300, ui.vw - 16), h = Math.min(ui.vh - 12, 200 + (res.medals?.length ? 32 : 0) + (res.heroic ? 6 : 0));
     const x = (ui.vw - w) >> 1, y = (ui.vh - h) >> 1;
     r.panel(x, y, w, h, { title: true });
     r.textBig(res.won ? 'VICTORY' : 'DEFEAT', x + w / 2, y + 10, res.won ? COLORS.good : COLORS.bad, 2);
@@ -291,6 +315,14 @@ export class ResultScreen {
       if (worst) for (const l of wrapText('TIP: ' + TIPS[worst[0]], Math.floor((w - 16) / 5))) { r.text(l, x + 8, cy, COLORS.warn); cy += 9; }
       cy += 4;
     }
+    if (res.won && res.heroic) { r.text('HEROIC VICTORY  +1 STAR', x + w / 2, cy - 6, COLORS.warn, { align: 'center' }); cy += 6; }
+    if (res.medals?.length) {
+      const M = app.ensureMedals();
+      const mx = Math.round(x + w / 2 - (res.medals.length * 19) / 2);
+      res.medals.slice(0, 6).forEach((id, i) => r.hi(M[id].on, mx + i * 19, cy));
+      r.text(res.medals.length === 1 ? `MEDAL: ${ACHIEVEMENTS.find((a) => a.id === res.medals[0]).name}` : `${res.medals.length} MEDALS EARNED`, x + w / 2, cy + 22, COLORS.warn, { align: 'center' });
+      cy += 32;
+    }
     const stat = (k, v) => { r.text(k, x + 16, cy, COLORS.dim); r.text(String(v), x + w - 16, cy, COLORS.text, { align: 'right' }); cy += 9; };
     stat('LIVES', `${res.lives}/${res.maxLives}`);
     stat('DROIDS DESTROYED', res.kills);
@@ -300,71 +332,9 @@ export class ResultScreen {
     const by = y + h - T - 8;
     const next = LEVEL_ORDER[LEVEL_ORDER.indexOf(res.levelId) + 1];
     const bw3 = Math.floor((w - 16 - 8) / 3);
-    if (ui.button('r:retry', x + 8, by, bw3, T, { label: res.won ? 'REPLAY' : 'RETRY', style: res.won ? 'normal' : 'accent' })) app.startLevel(res.levelId, res.difficulty);
-    if (ui.button('r:map', x + 12 + bw3, by, bw3, T, { label: 'MAP' })) app.toCampaign();
-    if (ui.button('r:next', x + 16 + 2 * bw3, by, bw3, T, { label: 'NEXT', style: res.won ? 'accent' : 'normal', disabled: !res.won || !next })) app.toBriefing(next);
-    ui.endFrame();
-  }
-}
-
-// -------------------------------------------------------------- campaign ---
-// Level select until the galaxy map arrives (Phase 3): one column per
-// planet, four levels each, unlocked in order by winning the one before.
-const PLANET_NAMES = { kamino: 'KAMINO', geonosis: 'GEONOSIS', kashyyyk: 'KASHYYYK', umbara: 'UMBARA', mustafar: 'MUSTAFAR' };
-const PLANET_COLORS = { kamino: '#7e9ea1', geonosis: '#c08f63', kashyyyk: '#7f8c5e', umbara: '#a46cff', mustafar: '#ff6a1f' };
-
-export function levelUnlocked(app, id) {
-  const i = LEVEL_ORDER.indexOf(id);
-  if (i <= 0 || app.unlockAll) return true;
-  return (app.save.levels[LEVEL_ORDER[i - 1]]?.wins || 0) > 0;
-}
-
-export class CampaignScreen {
-  constructor(app) {
-    this.app = app;
-    this.bg = new Backdrop(app);
-    app.audio.playMusic('galaxy');
-  }
-  update(dt, events) {
-    this.bg.update(dt);
-    const ui = this.app.ui;
-    for (const e of events) {
-      if (e.type === 'down') ui.down(e.id, e.x, e.y);
-      else if (e.type === 'move') ui.move(e.id, e.x, e.y);
-      else if (e.type === 'up' || e.type === 'cancel') ui.up(e.id, e.x, e.y);
-      else if (e.type === 'key' && e.key === 'Escape') this.app.toTitle();
-    }
-  }
-  render() {
-    const app = this.app, r = app.renderer, ui = app.ui, A = app.assets, T = ui.T;
-    r.begin();
-    this.bg.draw(r, ui);
-    ui.beginFrame();
-    const planets = Object.keys(PLANET_NAMES);
-    const colW = Math.min(96, Math.floor((ui.vw - 16 - ui.ins.left - ui.ins.right) / 5));
-    const x0 = Math.round((ui.vw - colW * 5) / 2);
-    const top = 8 + ui.ins.top;
-    r.text('CAMPAIGN', x0, top, COLORS.accent);
-    let stars = 0;
-    for (const id of LEVEL_ORDER) stars += app.save.levels[id]?.stars || 0;
-    r.text(`STARS ${stars} / 60`, x0 + colW * 5 - 2, top, COLORS.warn, { align: 'right' });
-    const y0 = top + 14;
-    const bh = Math.max(T, Math.min(40, Math.floor((ui.vh - y0 - T - 24 - ui.ins.bottom) / 4) - 6));
-    planets.forEach((p, i) => {
-      const x = x0 + i * colW;
-      r.rect(x + 2, y0, colW - 4, 10, PLANET_COLORS[p], 0.25);
-      r.text(PLANET_NAMES[p], x + colW / 2, y0 + 2, COLORS.text, { align: 'center' });
-      LEVEL_ORDER.filter((id) => LEVELS[id].planet === p).forEach((id, j) => {
-        const def = LEVELS[id];
-        const open = levelUnlocked(app, id);
-        const lv = app.save.levels[id];
-        const by = y0 + 14 + j * (bh + 5);
-        if (ui.button(`c:${id}`, x + 2, by, colW - 4, bh, { label: open ? `${def.index} ${def.name.toUpperCase()}`.slice(0, Math.floor((colW - 10) / 5)) : null, icon: open ? null : A.icons.lock, style: def.boss ? 'bad' : 'normal', disabled: !open })) app.toBriefing(id);
-        if (open && bh >= 28) for (let k = 0; k < 3; k++) r.hi(k < (lv?.stars || 0) ? A.icons.star : A.icons.starEmpty, x + colW / 2 - 15 + k * 10, by + bh - 11);
-      });
-    });
-    if (ui.button('c:back', x0, ui.vh - T - 6 - ui.ins.bottom, 70, T, { label: 'BACK' })) app.toTitle();
-    r.text('GALAXY MAP ARRIVES IN PHASE 3', x0 + colW * 5 - 2, ui.vh - 14 - ui.ins.bottom, COLORS.faint, { align: 'right' });
+    if (ui.button('r:retry', x + 8, by, bw3, T, { label: res.won ? 'REPLAY' : 'RETRY', style: res.won ? 'normal' : 'accent' })) app.go(() => app.startLevel(res.levelId, res.difficulty, res.heroic));
+    if (ui.button('r:map', x + 12 + bw3, by, bw3, T, { label: 'MAP' })) app.go(() => app.toGalaxy(LEVELS[res.levelId].planet));
+    if (ui.button('r:next', x + 16 + 2 * bw3, by, bw3, T, { label: 'NEXT', style: res.won ? 'accent' : 'normal', disabled: !res.won || !next })) app.go(() => app.toBriefing(next));
     ui.endFrame();
   }
 }

@@ -2,7 +2,8 @@
 // frame, never a bigger step), routes input to the HUD or the world, draws
 // the world and the HUD, and autosaves the full sim at every wave end.
 
-import { createSim, restore, snapshot, step, startWave, build, upgrade, sell, setTargeting, canPlace, wavePreview, TARGET_MODES, towerCenter, upgradeCost } from '../sim/sim.js';
+import { createSim, restore, snapshot, step, startWave, build, upgrade, sell, setTargeting, canPlace, wavePreview, TARGET_MODES, towerCenter, upgradeCost, towerStats, tierOptions, sandboxSpawn } from '../sim/sim.js';
+import { simTech, HEROIC_TOWERS, TECH_BY_ID } from '../data/meta.js';
 import { TOWERS, nextTiers, towerDps } from '../data/towers.js';
 import { ENEMIES } from '../data/enemies.js';
 import { DT, DIFFICULTY } from '../data/rules.js';
@@ -24,9 +25,15 @@ const EDGE = { kamino: '#1f2c33', geonosis: '#43291d', kashyyyk: '#2a2016', umba
 const MODE_LABEL = { first: 'FIRST', last: 'LAST', strongest: 'STRONGEST', closest: 'CLOSEST', air: 'AIR PRIORITY' };
 
 export class GameScreen {
-  constructor(app, { levelId = 'kamino-1', difficulty = 'jedi', snap = null, seed = null }) {
+  constructor(app, { levelId = 'kamino-1', difficulty = 'jedi', heroic = false, sandbox = false, snap = null, seed = null }) {
     this.app = app;
-    this.sim = snap ? restore(snap) : createSim({ levelId, difficulty, seed: seed ?? ((Date.now() & 0xffff) + 1) });
+    this.sim = snap ? restore(snap) : createSim({
+      levelId, difficulty, heroic, sandbox, seed: seed ?? ((Date.now() & 0xffff) + 1),
+      allowedTowers: heroic ? HEROIC_TOWERS[levelId] : null,
+      tech: sandbox ? null : simTech(app.save),
+    });
+    this.sandbox = !!this.sim.state.sandbox;
+    this.spawner = { type: 'trooper', count: 10 };
     this.level = this.sim.level;
     // per-planet art: ground tiles, props, boss; Umbara droids get night outlines
     const planet = (this.planet = this.level.def.planet);
@@ -156,14 +163,14 @@ export class GameScreen {
       return;
     }
     if (k === ' ') this.paused = !this.paused;
-    else if (k === '1' || k === '2' || k === '3') { this.speed = Number(k); this.paused = false; }
+    else if (k >= '1' && k <= (this.sandbox ? '5' : '3') && k.length === 1) { this.speed = Number(k); this.paused = false; }
     else if (k === 'escape') {
       if (this.placing) this.placing = null;
       else if (this.selId) this.selId = 0;
       else this.menu = 'pause';
     } else if (k === 'enter' || k === 'n') this.callWave();
     else if (BUILD_KEYS.includes(k)) this.pick(SLOT_TYPES[BUILD_KEYS.indexOf(k)]);
-    else if (k === 'z' && this.selected()) this.doUpgrade(nextTiers(this.selected().tier)[0]);
+    else if (k === 'z' && this.selected()) this.doUpgrade(tierOptions(this.s, this.selected())[0]);
   }
 
   moveGhost(dx, dy, touch) {
@@ -293,10 +300,12 @@ export class GameScreen {
   processEvents() {
     const evs = this.sim.events;
     if (!evs.length) return;
+    const un = this.app.save.unlocks;
     for (const e of evs) {
+      if ((e.t === 'spawn' || e.t === 'build') && !un[`seen:${e.type}`] && e.type !== 'vent') un[`seen:${e.type}`] = true;
       if (e.t === 'waveEnd') {
         this.tutorial?.signal(`waveEnded:${e.n}`);
-        this.app.autosave(this.sim);
+        if (!this.sandbox) this.app.autosave(this.sim);
       }
       if (e.t === 'wave') {
         const pv = wavePreview(this.sim);
@@ -419,12 +428,13 @@ export class GameScreen {
     r.spr(A.icons.credits, L + 40, top + 4);
     r.text(String(Math.round(this.creditsShown)), L + 52, top + 5, COLORS.warn);
     r.spr(A.icons.wave, L + 88, top + 4);
-    r.text(`WAVE ${Math.max(1, s.waveIndex)}/${s.totalWaves}`, L + 100, top + 5);
+    r.text(this.sandbox ? 'SANDBOX' : `WAVE ${Math.max(1, s.waveIndex)}/${s.totalWaves}`, L + 100, top + 5, this.sandbox ? COLORS.accent : COLORS.text);
     this.floaters.forEach((f, i) => r.text(f.text, L + 52, top + 20 + i * 9 - f.t * 6, COLORS.good, {}));
 
     // --- next-wave preview + start / call early
-    const pv = wavePreview(this.sim);
+    const pv = this.sandbox ? null : wavePreview(this.sim);
     const py = top + 20 + (this.floaters.length ? 0 : 0);
+    if (this.sandbox) this.drawSpawner(L, py);
     if (pv && s.phase !== 'won' && s.phase !== 'lost') {
       const pw = rw;
       let tallest = 0;
@@ -466,11 +476,13 @@ export class GameScreen {
     }
 
     // --- speed / pause / menu
-    const bx = R - 5 * (T + 2) + 2;
+    const speeds = this.sandbox ? 5 : 3;
+    const bx = R - (speeds + 2) * (T + 2) + 2;
     if (ui.button('hud:pause', bx, top, T, T, { icon: this.paused ? A.icons.play : A.icons.pause, active: this.paused })) this.paused = !this.paused;
-    for (let i = 1; i <= 3; i++)
+    for (let i = 1; i <= speeds; i++)
       if (ui.button(`hud:spd${i}`, bx + i * (T + 2), top, T, T, { label: `${i}x`, active: this.speed === i && !this.paused })) { this.speed = i; this.paused = false; }
-    if (ui.button('hud:menu', bx + 4 * (T + 2), top, T, T, { icon: A.icons.menu })) this.menu = 'pause';
+    if (ui.button('hud:menu', bx + (speeds + 1) * (T + 2), top, T, T, { icon: A.icons.menu })) this.menu = 'pause';
+    if (s.heroic) r.text(`HEROIC: ${s.allowedTowers.length} TOWER TYPES`, R, top + T + 4, COLORS.warn, { align: 'right' });
     if (this.paused && !this.menu) r.text('PAUSED - YOU CAN STILL BUILD', vw / 2, top + T + 16, COLORS.warn, { align: 'center' });
 
     // --- build bar
@@ -487,7 +499,7 @@ export class GameScreen {
         ui.button(`hud:slot${i}`, x, y0, BT, BT, { icon: A.icons.lock, disabled: true });
         return;
       }
-      const cost = TOWERS[type].tiers.t1.cost;
+      const cost = towerStats(s, type, 't1').cost;
       const afford = s.credits >= cost;
       const active = this.placing?.type === type;
       const hl = this.tutorial?.current()?.highlight === `build:${type}` && Math.floor(this.time * 3) % 2;
@@ -499,7 +511,7 @@ export class GameScreen {
       const dy = active ? 1 : 0;
       r.hi(ic.ref, x + ((BT - ic.w) >> 1), y0 + Math.max(1, BT - 9 - ic.h) + dy, afford ? 1 : 0.45);
       r.rect(x + 2, y0 + BT - 10 + dy, BT - 4, 7, '#0c1116', 0.75);
-      r.text(String(cost), x + BT / 2, y0 + BT - 9 + dy, afford ? COLORS.warn : COLORS.bad, { font: FONT5, align: 'center', shadow: null });
+      r.text(this.sandbox ? 'FREE' : String(cost), x + BT / 2, y0 + BT - 9 + dy, afford ? COLORS.warn : COLORS.bad, { font: FONT5, align: 'center', shadow: null });
       if (BT >= 26) r.text(BUILD_KEYS[i].toUpperCase(), x + 3, y0 + 2 + dy, COLORS.faint, { font: FONT5, shadow: null });
     });
 
@@ -577,8 +589,10 @@ export class GameScreen {
 
   drawInfo(t, R, y, maxY) {
     const app = this.app, r = app.renderer, ui = app.ui, T = ui.T, s = this.s;
-    const def = TOWERS[t.type], st = def.tiers[t.tier];
+    const def = TOWERS[t.type], st = towerStats(s, t.type, t.tier);
     const nexts = nextTiers(t.tier);
+    const open = tierOptions(s, t);
+    const dps = (tier) => towerDps(t.type, tier, towerStats(s, t.type, tier));
     const w = 170;
     const x = R - w;
     const rowH = 9;
@@ -603,7 +617,7 @@ export class GameScreen {
       row('DEPOTS', `${s.towers.filter((o) => o.type === 'depot').length} / 3`);
       cy += 2 + T + 6;
     } else {
-      row('DPS', towerDps(t.type, t.tier).toFixed(1));
+      row('DPS', dps(t.tier).toFixed(1));
       row('DAMAGE', def.dtype.toUpperCase());
       row('HITS AIR', st.air ? 'YES' : 'NO', st.air ? COLORS.good : COLORS.bad);
       r.text(`KILLS ${t.kills}`, x + w - 6, y + 16, COLORS.faint, { align: 'right' });
@@ -638,18 +652,20 @@ export class GameScreen {
       cy += rowH;
       const bw = Math.floor((w - 15) / 2);
       nexts.forEach((b, i) => {
-        const bs = def.tiers[b];
+        const bs = towerStats(s, t.type, b);
+        const locked = !open.includes(b);
         const afford = s.credits >= bs.cost;
-        if (ui.button(`info:up:${b}`, x + 6 + i * (bw + 3), cy, bw, T, { label: bs.name.toUpperCase(), sub: String(bs.cost), style: afford ? 'accent' : 'normal', disabled: !afford })) this.doUpgrade(b);
+        const sub = locked ? 'TECH TREE' : String(bs.cost);
+        if (ui.button(`info:up:${b}`, x + 6 + i * (bw + 3), cy, bw, T, { label: bs.name.toUpperCase(), sub, icon: locked && T < 28 ? this.app.assets.icons.lock : null, style: afford && !locked ? 'accent' : 'normal', disabled: !afford || locked })) this.doUpgrade(b);
       });
       cy += T + 4;
       sell(x + 6, w - 12, Math.min(cy, y + h - T - 5));
     } else {
-      const ns = def.tiers[nexts[0]];
+      const ns = towerStats(s, t.type, nexts[0]);
       r.text(`NEXT: ${ns.name.toUpperCase()}`, x + 6, cy, COLORS.dim);
       cy += rowH + 1;
       const rows = [
-        ...(st.rate ? [['DPS', towerDps(t.type, t.tier), towerDps(t.type, nexts[0]), (v) => v.toFixed(1)], ['RANGE', st.range, ns.range, String]] : [['INCOME', st.income || 0, ns.income || 0, String]]),
+        ...(st.rate ? [['DPS', dps(t.tier), dps(nexts[0]), (v) => v.toFixed(1)], ['RANGE', st.range, ns.range, String]] : [['INCOME', st.income || 0, ns.income || 0, String]]),
         ['SPLASH', st.splash || 0, ns.splash || 0, String],
         ['AIR', st.air ? 1 : 0, ns.air ? 1 : 0, (v) => (v ? 'YES' : 'NO')],
       ].filter((d, i) => i < 2 || d[1] !== d[2]).slice(0, diffRows);
@@ -659,7 +675,7 @@ export class GameScreen {
         cy += rowH;
       }
       cy = Math.min(cy + 2, y + h - T - 5);
-      const cost = upgradeCost(t, nexts[0]);
+      const cost = upgradeCost(t, nexts[0], s);
       const afford = s.credits >= cost;
       const uw = Math.round((w - 15) * 0.56);
       if (ui.button('info:up', x + 6, cy, uw, T, { label: `UPGRADE ${cost}`, style: afford ? 'accent' : 'normal', disabled: !afford })) this.doUpgrade(nexts[0]);
@@ -695,7 +711,34 @@ export class GameScreen {
     if (b('pause:resume', 'RESUME', 'accent')) this.menu = null;
     if (b('pause:restart', 'RESTART', 'normal')) app.restartLevel(this.sim);
     if (b('pause:settings', 'SETTINGS', 'normal')) this.menu = 'settings';
-    if (b('pause:quit', 'QUIT TO MENU', 'bad')) app.quitLevel(this.sim);
+    if (b('pause:quit', this.sandbox ? 'LEAVE SANDBOX' : 'QUIT TO MENU', 'bad')) app.quitLevel(this.sim);
+  }
+
+  // Sandbox spawner: droid type, count, spawn, boss list, invincible base.
+  drawSpawner(L, y) {
+    const app = this.app, r = app.renderer, ui = app.ui, T = ui.T, A = app.assets, s = this.s, sp = this.spawner;
+    const types = Object.keys(ENEMIES);
+    const w = 156, h = 18 + 3 * (T + 3);
+    r.panel(L, y, w, h, { title: true });
+    ui.block('sb:bg', L, y, w, h);
+    r.text('SPAWNER', L + 6, y + 4, COLORS.accent);
+    let cy = y + 15;
+    const i = types.indexOf(sp.type);
+    if (ui.button('sb:prev', L + 4, cy, T, T, { label: '<' })) sp.type = types[(i + types.length - 1) % types.length];
+    r.text(ENEMIES[sp.type].name.toUpperCase().slice(0, 18), L + w / 2, cy + ((T - 7) >> 1), ENEMIES[sp.type].boss ? COLORS.bad : COLORS.text, { align: 'center' });
+    if (ui.button('sb:next', L + w - 4 - T, cy, T, T, { label: '>' })) sp.type = types[(i + 1) % types.length];
+    cy += T + 3;
+    const boss = !!ENEMIES[sp.type].boss;
+    if (ui.button('sb:minus', L + 4, cy, T, T, { label: '-', disabled: boss })) sp.count = Math.max(1, sp.count - (sp.count > 10 ? 5 : 1));
+    r.text(boss ? 'BOSS x1' : `x${sp.count}`, L + 4 + T + 18, cy + ((T - 7) >> 1), COLORS.text, { align: 'center' });
+    if (ui.button('sb:plus', L + 4 + T + 36, cy, T, T, { label: '+', disabled: boss })) sp.count = Math.min(60, sp.count + (sp.count >= 10 ? 5 : 1));
+    if (ui.button('sb:spawn', L + 4 + 2 * T + 40, cy, w - 8 - 2 * T - 40, T, { label: 'SPAWN', style: 'accent' })) {
+      sandboxSpawn(this.sim, sp.type, sp.count);
+      if (boss) app.audio.sfx('siren');
+    }
+    cy += T + 3;
+    const inv = !!s.sandbox.invincible;
+    if (ui.button('sb:inv', L + 4, cy, w - 8, T, { label: `INVINCIBLE BASE: ${inv ? 'ON' : 'OFF'}`, style: inv ? 'good' : 'normal' })) s.sandbox.invincible = !inv;
   }
 }
 

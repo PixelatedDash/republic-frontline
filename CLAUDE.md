@@ -19,11 +19,12 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
   - `font.js` pixel fonts (FONT7 UI, FONT5 damage numbers)
   - `sprites/*.js` hand-placed pixel maps; `towers.js`, `enemies.js`, `tilemap.js`, `vfx.js`, `ui.js` builders
   - `index.js` `buildArt()` — the single entry point the game and the tools call
+  - `galaxy.js` planet globes (hand-placed surface maps wrapped on a sphere), cruiser, nebula; `medals.js` medal icons
 - `src/engine/` — scaling (UI S + world SW), camera (eased integer zoom, momentum), input, atlas, renderer, audio (synth SFX + music sequencer), assets, pool, rng
 - `src/sim/` — pure deterministic simulation (no DOM, no Math.random). State is plain JSON with ids; `sim.events` feed fx/audio/UI
 - `src/fx/` — pooled particles/decals/corpses driven by sim events; dynamic quality
-- `src/ui/` — screens (boot/title/briefing/result), game screen, world draw, HUD widgets (immediate mode), tutorial, settings, debug
-- `src/data/` — towers, enemies (incl. bosses), rules (damage table, difficulty, economy), balance (per-level hp scale), levels (one file per planet; waves are recipes composed by `levels/waves.js`), music
+- `src/ui/` — screens (boot/title/briefing/result), meta screens (`meta-screens.js`: galaxy + planet view, tech terminal, medals + stats, archives, ending), game screen, world draw, HUD widgets (immediate mode), tutorial, settings, debug
+- `src/data/` — towers, enemies (incl. bosses), rules (damage table, difficulty, economy), balance (per-level hp scale), meta (tech tree, Heroic sets, achievements, archive), levels (one file per planet; waves are recipes composed by `levels/waves.js`), music
 - `src/save/` — schema (versioned, migrations, merge) + IndexedDB storage
 - `tools/` — Node-only: `export-art.mjs` (+ `art/` helpers incl. headless game), `sim/run.mjs` + `sim/bots.mjs`, `serve.mjs`
 - `tests/` — `node --test` suites
@@ -55,5 +56,5 @@ Start every session by reading this file, `PROGRESS.md` and `DECISIONS.md`.
 - `node tools/art/lint-art.mjs` — orphan-pixel check on every composed tower/enemy/boss/prop frame (Phase 1 + 2)
 - `node tools/serve.mjs [port] [--lan]` — no-cache dev server (`--lan` to test on a phone over Wi-Fi; no service worker over http)
 - `npm test` — unit tests; `node tools/sim/run.mjs --level kamino-1 --difficulty jedi --bot balanced --seeds 5` — headless bots
-- `?skip=1` (Kamino 1) or `?skip=<level-id>` jumps into a level; `?unlock=1` opens every level (dev shortcuts)
+- `?skip=1` (Kamino 1) or `?skip=<level-id>` jumps into a level (`&heroic=1`), `?sandbox=<level-id>`, `?screen=galaxy|tech|medals|archives`; `?unlock=1` opens every level (dev shortcuts)
 - After any art export: open the PNGs in `art-preview/` and critique them against the art rules before presenting.

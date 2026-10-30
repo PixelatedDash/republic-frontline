@@ -96,3 +96,30 @@
 - Frame rate in big Phase 2 waves on iPhone (benchmark is Phase 5).
 - Push from GitHub Desktop (commits + tags `phase-0`..`phase-2` are local).
 
+
+## 2026-10-29 — Phase 3 (meta and modes) — complete, STOP for review
+
+Andrew asked me to keep going through the remaining phases while away ("do all work that doesn't require specific executive input"), so this STOP is recorded here instead of waiting.
+
+**Done**
+- Galaxy map: parallax starfield + nebula, 5 rotating planet globes, dotted route, original Republic cruiser that flies to the selected planet, smooth zoom into a planet view with 4 level nodes (stars, Heroic medal slot, lock, boss tag) and a level panel (Briefing / Sandbox).
+- Stars out of 80 everywhere (3 per level + 1 Heroic).
+- Tech tree terminal: 8 branches x 4 nodes, 72 stars, tier-4 branches locked until bought, free refunds; tech applied in the sim (`towerStats`) and the HUD.
+- Medals: 29 achievements, each with its own pixel medal (earned + locked art); medal toasts on the result screen.
+- Archives: every tower, droid and boss, unlocked on first encounter, animated preview, stats, layer/body/shield, weaknesses, lore.
+- Stats tab: kills total and by type, playtime, credits, wins/losses, levels and Heroic wins, best run per planet.
+- Difficulty modes (existing) + Heroic replay (fixed 4-tower set per level, Master stats, 11 lives, boss leak = loss) + Sandbox (spawner, invincible base, 1-5x, unlimited credits, all tier-4).
+- Title screen (Play / Archives / Medals / Settings / Account), briefing with Heroic toggle, victory/defeat screens with medals, pixel-iris transitions, campaign-ending cinematic.
+- Save schema v3 (tech tree, per-level Jedi Master wins) with migration and merge rules; sim snapshot v3.
+
+**Verified (how)**
+- `npm test`: 56 tests, incl. new `tests/phase3.test.mjs` (80 stars, tech budget and per-planet affordability, buy/refund cascade, tech mods + tier-4 lock in the sim and across snapshots, Sandbox rules, v2 -> v3 migration, tech merge, achievements awarded once, Heroic sets valid, archive covers every unit).
+- Art lint: 1042 frames (adds medals + cruiser), 0 orphan pixels; planet/cruiser/medal/nebula previews rendered and reviewed (planet textures smoothed, cruiser redrawn, nebula alpha bug fixed).
+- Browser pane (desktop Chromium): galaxy map, planet view, tech terminal, medals + stats, archives (all three tabs), title, Heroic briefing, Sandbox with boss spawns, campaign ending, result screen with 5 medals; no console errors after fixes.
+- Headless: normal, Heroic and Sandbox games run 480 frames each with no errors.
+- Balance unchanged: bots/report run with `tech: null`, identical to the Phase 2 report.
+
+**Not verified, needs Andrew**
+- Feel of the galaxy zoom, cruiser flight and iris transition at full frame rate on iPhone (the browser pane throttles animation in the background, so I checked end states).
+- Whether the tech stat bonuses make later levels too easy once the tree is full (the bots measure the base game only).
+- Heroic difficulty: the balanced bot does not win Jedi Master anywhere, so Heroic replays are untested for winnability.

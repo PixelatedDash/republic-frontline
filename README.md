@@ -1,7 +1,7 @@
 # Republic Frontline
 
 Pixel-art tower defense PWA (Republic clone troopers vs. the droid army). Vanilla JS + Canvas 2D, no build step.
-Status: Phase 2 full content (20 levels on 5 planets, 8 towers, 14 droids, 5 bosses). See `PROGRESS.md`.
+Status: Phase 3 meta and modes (galaxy map, tech tree, medals, archives, Heroic, Sandbox) on top of the full campaign (20 levels, 8 towers, 14 droids, 5 bosses). See `PROGRESS.md`.
 
 **Play it:** https://pixelateddash.github.io/republic-frontline/ (GitHub Pages from `main` / root; every push to `main` redeploys).
 
@@ -11,7 +11,7 @@ Status: Phase 2 full content (20 levels on 5 planets, 8 towers, 14 droids, 5 bos
 node tools/serve.mjs
 ```
 
-Open http://localhost:8765. Add `?skip=1` to jump straight into Kamino 1, `?skip=geonosis-4` (any level id) to jump into that level, and `?unlock=1` to open every level in the campaign screen.
+Open http://localhost:8765. Dev shortcuts: `?skip=1` (Kamino 1) or `?skip=geonosis-4` (any level id, add `&heroic=1` for a Heroic replay), `?sandbox=geonosis-2`, `?screen=galaxy|tech|medals|archives`, and `?unlock=1` to open every level on the galaxy map.
 
 ### On your iPhone over Wi-Fi (gameplay only, no PWA features)
 

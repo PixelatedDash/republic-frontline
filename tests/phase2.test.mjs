@@ -213,6 +213,8 @@ test('Phase 1 (v1) mid-level snapshots restore with sane Phase 2 fields', async 
   const r = restore(snap);
   for (let i = 0; i < 300; i++) { step(r); r.events.length = 0; }
   for (const x of r.state.enemies) assert.ok(Number.isFinite(x.shield) && Number.isFinite(x.hp));
-  assert.equal(r.state.v, 2);
+  assert.equal(r.state.v, 3);
+  assert.equal(r.state.tech, null);
+  assert.equal(r.state.stats.sold, 0);
   assert.ok(e);
 });

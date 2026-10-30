@@ -101,6 +101,8 @@ export const ICONS = {
   sell: ['..kkkkk..', '.kdddddk.', 'kddddDDDk', 'kdkkkkkDk', 'kdddDDDDk', '.kDDDDDk.', '..kkkkk..'],
   target: ['..kck..', '.k.c.k.', 'k..c..k', 'cccCccc', 'k..c..k', '.k.c.k.', '..kck..'],
   star: ['....k....', '...kdk...', 'kkkkddkkk', 'kddddddDk', '.kdddDDk.', '..kdDDk..', '.kdDkkDk.', '.kDk..kDk', '.kk....kk'],
+  heroic: ['.kk.kk.', '.kVkUk.', '..kVk..', '.kkkkk.', 'kddddDk', 'kdWdDDk', 'kddDDDk', '.kDDDk.', '..kkk..'],
+  heroicEmpty: ['.kk.kk.', '.k5k6k.', '..k5k..', '.kkkkk.', 'k55556k', 'k55566k', 'k55666k', '.k666k.', '..kkk..'],
   starEmpty: ['....k....', '...k5k...', 'kkkk55kkk', 'k5555556k', '.k55566k.', '..k566k..', '.k56kk6k.', '.k6k..k6k', '.kk....kk'],
 };
 

@@ -3,7 +3,8 @@
 //
 // {
 //   saveVersion, updatedAt (ms),
-//   levels:   { [levelId]: { stars, heroic, bestLives, wins } },
+//   levels:   { [levelId]: { stars, heroic, bestLives, wins, master } },
+//   tech:     { [nodeId]: true } (stars spent in the tech tree),
 //   unlocks:  { [key]: true },
 //   achievements: { [id]: unlockedAtMs },
 //   stats:    { kills: {type: n}, playSeconds, creditsEarned, wins, losses },
@@ -11,7 +12,7 @@
 //   inProgress: null | { levelId, difficulty, heroic, updatedAt, snapshot }
 // }
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export const DEFAULT_SETTINGS = {
   master: 0.8, music: 0.6, sfx: 0.8, muted: false,
@@ -23,6 +24,7 @@ export function emptySave(now = 0) {
     saveVersion: SAVE_VERSION,
     updatedAt: now,
     levels: {},
+    tech: {},
     unlocks: {},
     achievements: {},
     stats: { kills: {}, playSeconds: 0, creditsEarned: 0, wins: 0, losses: 0 },
@@ -48,6 +50,12 @@ export const MIGRATIONS = {
     if (out.inProgress) out.inProgress = { heroic: false, ...out.inProgress };
     return out;
   },
+  // v2 -> v3: tech tree (Phase 3); levels gained `master` (won on Jedi Master).
+  2: (d) => {
+    const levels = {};
+    for (const [id, lv] of Object.entries(d.levels || {})) levels[id] = { master: false, ...lv };
+    return { ...d, saveVersion: 3, tech: { ...(d.tech || {}) }, levels };
+  },
 };
 
 export function migrate(doc) {
@@ -67,6 +75,7 @@ function fillDefaults(d) {
   return {
     ...e,
     ...d,
+    tech: { ...(d.tech || {}) },
     stats: { ...e.stats, ...(d.stats || {}), kills: { ...(d.stats?.kills || {}) } },
     settings: { ...e.settings, ...(d.settings || {}) },
   };
@@ -81,8 +90,9 @@ function mergeKeyed(a = {}, b = {}, fn) {
 }
 
 // Merge two saves without ever losing progress: max per field for progress
-// and cumulative stats; the newer in-progress snapshot wins; settings follow
-// the newer document.
+// and cumulative stats; the newer in-progress snapshot wins; settings and
+// the tech tree (stars spent, refundable) follow the newer document, so a
+// merge can never spend more stars than were earned.
 export function mergeSaves(x, y) {
   const a = migrate(x), b = migrate(y);
   const newer = (b.updatedAt || 0) > (a.updatedAt || 0) ? b : a;
@@ -98,7 +108,9 @@ export function mergeSaves(x, y) {
       heroic: !!(p.heroic || q.heroic),
       bestLives: maxNum(p.bestLives, q.bestLives),
       wins: maxNum(p.wins, q.wins),
+      master: !!(p.master || q.master),
     })),
+    tech: { ...newer.tech },
     unlocks: mergeKeyed(a.unlocks, b.unlocks, (p, q) => p || q),
     achievements: mergeKeyed(a.achievements, b.achievements, (p, q) => Math.min(p, q) || p || q),
     stats: {
